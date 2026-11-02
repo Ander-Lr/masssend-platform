@@ -27,7 +27,7 @@ test-gateway:
 
 lint: imagen
 	docker run --rm --network none $(IMAGEN) sh -c \
-		"ruff check masssend tests && mypy masssend/domain masssend/application"
+		"ruff check masssend tests && mypy masssend/domain masssend/application tests/fakes tests/unit"
 
 arch: imagen
 	docker run --rm --network none $(IMAGEN) lint-imports

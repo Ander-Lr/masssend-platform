@@ -4,11 +4,25 @@ line-length = 100
 src = ["."]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "TID251"]
+
+[tool.ruff.lint.per-file-ignores]
+# Aqui viven los adaptadores reales de reloj, azar e identificadores.
+"masssend/infrastructure/**" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"datetime.datetime.now".msg = "Usa el puerto IReloj."
+"datetime.datetime.utcnow".msg = "Usa el puerto IReloj."
+"time.sleep".msg = "El nucleo y las pruebas no esperan tiempo real."
+"random".msg = "Usa el puerto IAleatorio."
+"secrets".msg = "Usa el puerto IAleatorio."
+"uuid.uuid4".msg = "Usa el puerto IGeneradorIds."
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
+explicit_package_bases = true
+mypy_path = "."
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
