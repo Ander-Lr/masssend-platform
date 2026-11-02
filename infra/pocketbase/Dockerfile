@@ -1,0 +1,7 @@
+FROM alpine:latest
+ARG PB_VERSION=0.39.8
+RUN apk add --no-cache unzip ca-certificates
+ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
+RUN unzip /tmp/pb.zip -d /pb/ && rm /tmp/pb.zip
+EXPOSE 8080
+CMD ["sh", "-c", "mkdir -p /pb/pb_data; if [ -n \"${PB_SUPERUSER_EMAIL:-}\" ] && [ -n \"${PB_SUPERUSER_PASSWORD:-}\" ]; then echo 'Creando o verificando superusuario...'; /pb/pocketbase superuser upsert \"$PB_SUPERUSER_EMAIL\" \"$PB_SUPERUSER_PASSWORD\" --dir=/pb/pb_data; else echo 'Variables de superusuario no recibidas'; fi; exec /pb/pocketbase serve --http=0.0.0.0:8080 --dir=/pb/pb_data"]

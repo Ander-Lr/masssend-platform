@@ -1,0 +1,72 @@
+# ── Python / Django ──────────────────────────────────────
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.env
+/.env
+/.env.*
+!/.env.example
+backend/db.sqlite3
+
+# ── Media subida por usuarios ─────────────────────────────
+backend/media/
+
+# ── Node.js ───────────────────────────────────────────────
+backend/whatsapp_api/node_modules/
+
+# ── Sesión de WhatsApp (NO subir nunca) ───────────────────
+backend/whatsapp_api/.wwebjs_auth/
+backend/whatsapp_api/.wwebjs_cache/
+backend/whatsapp_api/session/
+
+# ── Sesión Baileys (credenciales WhatsApp) ────────────────
+backend/whatsapp_api/auth_info_baileys/
+backend/whatsapp_api/baileys_store.json
+
+# ── Frontend build / dependencias ────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── Informe / documentos Word ────────────────────────────
+*.docx
+*.doc
+~$*.docx
+
+# ── PDF y presentaciones ─────────────────────────────────
+*.pdf
+*.pptx
+*.ppt
+
+# ── Notas, guías y prompts internos (solo en el equipo local) ─
+# El README.md y la guía de reproducción de pruebas sí se suben;
+# el resto de .md sueltos en la raíz, no.
+/*.md
+!/README.md
+!/REPRODUCIR_PRUEBAS.md
+
+# ── Imágenes/diagramas de documentación en la raíz ───────
+# (los recursos reales de la app, dentro de frontend/backend, no se tocan)
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.svg
+
+# ── Docs internos que no van al repo ─────────────────────
+COMO_CONECTAR_WHATSAPP.md
+CONCEPTOS_DISTRIBUIDOS.md
+GUIA_REACT_FRONTEND.md
+SUSTENTACION_TECNICA.md
+
+# ── node_modules a nivel raíz (backend/frontend ya cubiertos arriba) ─
+/node_modules/
+
+# ── Archivos del sistema ──────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+docs/
