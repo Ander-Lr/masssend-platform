@@ -2,6 +2,9 @@
 IMAGEN := masssend-tests
 GATEWAY := masssend-gateway-tests
 INTEGRACION := docker compose -f tests/compose.yaml
+API_PORT ?= 8000
+CI := API_PORT=$(API_PORT) docker compose -p masssend-ci -f ../compose.yaml \
+	--env-file tests/ci.env --profile ci
 
 .PHONY: imagen test test-int test-legacy test-gateway lint arch check e2e
 
@@ -27,18 +30,23 @@ test-gateway:
 
 lint: imagen
 	docker run --rm --network none $(IMAGEN) sh -c \
-		"ruff check masssend tests && mypy masssend/domain masssend/application tests/fakes tests/unit"
+		"ruff check config masssend tests && mypy masssend/domain masssend/application tests/fakes tests/unit"
 
 arch: imagen
 	docker run --rm --network none $(IMAGEN) lint-imports
 
 check: lint arch test
 
-# Requiere la API en ejecución y Postman CLI; las colecciones llegan en el Paso 4.
+# Levanta el perfil ci, corre las colecciones de Postman y lo apaga todo.
+# Requiere Postman CLI. Tiene su propio proyecto: nunca toca los datos reales.
 e2e:
-	@ls ../postman/collections/*.json > /dev/null 2>&1 || \
-		{ echo "Aun no hay colecciones en postman/collections."; exit 1; }
-	@for c in ../postman/collections/*.json; do \
-		postman collection run "$$c" -e ../postman/environments/local.postman_environment.json \
-			|| exit 1; \
-	done
+	@$(CI) up --build -d --wait --wait-timeout 180; \
+	s=$$?; \
+	if [ $$s = 0 ]; then \
+		for c in ../postman/collections/*.json; do \
+			postman collection run "$$c" \
+				-e ../postman/environments/local.postman_environment.json \
+				--env-var "baseUrl=http://localhost:$(API_PORT)" || { s=1; break; }; \
+		done; \
+	fi; \
+	$(CI) down -v > /dev/null 2>&1; exit $$s

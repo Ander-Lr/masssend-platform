@@ -24,7 +24,7 @@ services:
     environment:
       DATABASE_URL: postgres://masssend_tests:solo-pruebas@postgres:5432/masssend_tests
       DB_SSL_REQUIRE: "False"
-      DJANGO_SETTINGS_MODULE: core.settings
+      DJANGO_SETTINGS_MODULE: config.settings.base
     command: pytest tests/integration
     depends_on:
       postgres:
