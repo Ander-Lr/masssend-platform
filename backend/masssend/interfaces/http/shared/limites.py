@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from rest_framework.request import Request
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -26,3 +26,12 @@ class LimiteAnonimo(_SinBloquearSiFallaLaCache, AnonRateThrottle):
 
 class LimiteUsuario(_SinBloquearSiFallaLaCache, UserRateThrottle):
     scope = "usuario_v1"
+
+
+class LimiteSensible(_SinBloquearSiFallaLaCache, SimpleRateThrottle):
+    """Frena la fuerza bruta por IP en rutas de credenciales, con o sin sesion."""
+
+    scope = "sensible_v1"
+
+    def get_cache_key(self, request: Request, view: Any) -> str:
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "01 Identidad",
-    "description": "Plataforma de la API v1. Las peticiones de identidad se agregan en los pasos siguientes.",
+    "description": "Plataforma e identidad de la API v1. Corre contra el perfil ci: lee los codigos desde Mailpit y calcula el TOTP con un script.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -155,6 +155,1973 @@
                 "exec": [
                   "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
                   "pm.test(\"No es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.not.include(\"problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Registro y verificacion",
+      "item": [
+        {
+          "name": "Preparar correo unico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "pm.environment.set('correosVistos', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Ana Lara\", \"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigo', v);",
+                  "  });",
+                  "});",
+                  "leer(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar con clave corta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Ana\", \"correo\": \"corta@prueba.local\", \"contrasena\": \"123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login sin verificar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar con codigo malo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reenviar codigo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reenviar-codigo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reenviar-codigo"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigo', v);",
+                  "  });",
+                  "});",
+                  "leer(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"codigo\": \"{{codigo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta ya activa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Otra\", \"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo estado_invalido\", () => pm.expect(pm.response.json().codigo).to.eql(\"estado_invalido\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Doble factor",
+      "item": [
+        {
+          "name": "Login sin doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secreto', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar con codigo malo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado del doble factor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "estado"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Esta activo\", () => pm.expect(pm.response.json().activo).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inicio de sesion",
+      "item": [
+        {
+          "name": "Contrasena incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"incorrecta\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "TOTP sin desafio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"inventado\", \"codigo\": \"123456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Pide TOTP\", () => pm.expect(pm.response.json().siguiente).to.eql(\"totp\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validar TOTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 1));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desafio reutilizado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login para codigo repetido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Codigo reutilizado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/yo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "yo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Es la cuenta\", () => pm.expect(p.correo).to.eql(pm.environment.get(\"correo\")));",
+                  "pm.test(\"No expone secretos\", () => pm.expect(p).to.not.have.any.keys(\"mfa_secreto\", \"hash_contrasena\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perfil sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/yo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "yo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token/renovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"renovacion\": \"{{renovacion}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set('renovacionVieja', pm.environment.get('renovacion'));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);",
+                  "pm.environment.set('renovacionParaCerrar', pm.environment.get('renovacion'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar con token ya usado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token/renovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"renovacion\": \"{{renovacionVieja}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Google",
+      "item": [
+        {
+          "name": "Iniciar Google",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set('estadoGoogle', pm.response.json().url.split('state=')[1]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Google con estado falso",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google/callback?state=falso&code=ana",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "falso"
+                },
+                {
+                  "key": "code",
+                  "value": "ana"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Completar Google",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google/callback?state={{estadoGoogle}}&code=ana{{$timestamp}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "{{estadoGoogle}}"
+                },
+                {
+                  "key": "code",
+                  "value": "ana{{$timestamp}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Google no evita el doble factor\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cierre de sesion",
+      "item": [
+        {
+          "name": "Cerrar sesion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"renovacion\": \"{{renovacion}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar tras cerrar sesion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token/renovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"renovacion\": \"{{renovacion}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contrasena",
+      "item": [
+        {
+          "name": "Login para sesion nueva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Pide TOTP\", () => pm.expect(pm.response.json().siguiente).to.eql(\"totp\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sesion nueva (espera el siguiente periodo TOTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Cada codigo sirve una vez: se espera a que empiece otro periodo de 30 segundos.",
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "const espera = 30000 - (Date.now() % 30000) + 500;",
+                  "setTimeout(() => pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 1)), espera);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar con clave incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/cambiar-contrasena",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "cambiar-contrasena"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"contrasena_actual\": \"incorrecta\", \"nueva_contrasena\": \"clave-nueva-456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar contrasena",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/cambiar-contrasena",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "cambiar-contrasena"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"contrasena_actual\": \"clave-larga-123\", \"nueva_contrasena\": \"clave-nueva-456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sesion revocada tras el cambio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/token/renovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "token",
+                "renovar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"renovacion\": \"{{renovacion}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar cuenta inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"nadie@prueba.local\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "// Espera el correo en Mailpit y guarda tokenRecuperacion.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/token=([\\w-]+)/)[1];",
+                  "    pm.environment.set('tokenRecuperacion', v);",
+                  "  });",
+                  "});",
+                  "leer(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restablecer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/restablecer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "restablecer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"{{tokenRecuperacion}}\", \"nueva_contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enlace reutilizado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/restablecer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "restablecer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"{{tokenRecuperacion}}\", \"nueva_contrasena\": \"clave-nueva-456\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bloqueo por intentos",
+      "item": [
+        {
+          "name": "Login para el bloqueo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallo 1 de 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallo 2 de 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallo 3 de 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallo 4 de 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallo 5 de 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sexto intento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login/totp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login",
+                "totp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"000000\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 429\", () => pm.response.to.have.status(429));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo demasiados_intentos\", () => pm.expect(pm.response.json().codigo).to.eql(\"demasiados_intentos\"));",
+                  "pm.test(\"Indica la espera\", () => pm.expect(Number(pm.response.headers.get(\"Retry-After\"))).to.be.above(0));"
                 ]
               }
             }
