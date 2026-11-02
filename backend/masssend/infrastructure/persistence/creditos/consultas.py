@@ -23,6 +23,10 @@ class ConsultasCreditosDjango:
             for p in CreditPack.objects.filter(is_active=True)
         ]
 
+    def paquete_activo(self, paquete_id: int) -> Paquete | None:
+        p = CreditPack.objects.filter(pk=paquete_id, is_active=True).first()
+        return Paquete(p.id, p.name, p.credits, Dinero.desde_decimal(p.price_usd)) if p else None
+
     def movimientos(
         self, dueno_id: IdPublico, peticion: PeticionPagina
     ) -> Pagina[Movimiento]:

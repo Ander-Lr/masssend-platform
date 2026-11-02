@@ -2,16 +2,25 @@ from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from django.utils import timezone
 
-from billing.models import CreditSpend, CreditWallet
+from billing.models import CreditSpend, CreditWallet, PaymentTransaction
 from billing.repositories import wallet_repository
 from masssend.domain.creditos.billetera import Billetera
+from masssend.domain.creditos.compra import Compra, EstadoCompra
 from masssend.domain.creditos.reserva import Reserva
+from masssend.domain.shared.dinero import Dinero
 from masssend.domain.shared.errores import RecursoNoEncontrado
 from masssend.domain.shared.identificadores import IdPublico
 from masssend.infrastructure.persistence.creditos.models import ConsumoCredito, ReservaCreditos
 from masssend.infrastructure.persistence.identidad.models import CuentaIdentidad
 
 Usuario = get_user_model()
+
+ESTADOS = {
+    PaymentTransaction.STATUS_PENDING: EstadoCompra.PENDIENTE,
+    PaymentTransaction.STATUS_APPROVED: EstadoCompra.APROBADA,
+    PaymentTransaction.STATUS_FAILED: EstadoCompra.RECHAZADA,
+}
+ESTADOS_DB = {estado: clave for clave, estado in ESTADOS.items()}
 
 
 def usuario_de(dueno_id: IdPublico) -> int:
@@ -98,4 +107,52 @@ class RepoReservasDjango:
             IdPublico(fila.campana_id),
             fila.cantidad,
             fila.restante,
+        )
+
+
+class RepoComprasDjango:
+    def agregar(self, compra: Compra) -> None:
+        PaymentTransaction.objects.create(
+            id=compra.id,
+            user_id=usuario_de(compra.dueno_id),
+            pack_id=compra.paquete_id,
+            provider=compra.pasarela,
+            provider_reference=compra.referencia,
+            amount_usd=compra.monto.como_decimal(),
+            credits=compra.creditos,
+            status=ESTADOS_DB[compra.estado],
+        )
+
+    def obtener(self, compra_id: IdPublico) -> Compra:
+        return self._a_compra(PaymentTransaction.objects.all(), compra_id)
+
+    def bloquear(self, compra_id: IdPublico) -> Compra:
+        return self._a_compra(PaymentTransaction.objects.select_for_update(), compra_id)
+
+    def guardar(self, compra: Compra, respuesta: dict[str, object]) -> None:
+        PaymentTransaction.objects.filter(pk=compra.id).update(
+            status=ESTADOS_DB[compra.estado],
+            raw_response=respuesta,
+            updated_at=timezone.now(),
+        )
+
+    @staticmethod
+    def _a_compra(consulta, compra_id: IdPublico) -> Compra:  # type: ignore[no-untyped-def]
+        fila = consulta.filter(pk=compra_id).first()
+        if fila is None:
+            raise RecursoNoEncontrado("La compra no existe.")
+        dueno = CuentaIdentidad.objects.values_list("public_id", flat=True).filter(
+            usuario_id=fila.user_id
+        ).first()
+        if dueno is None:
+            raise RecursoNoEncontrado("La compra no existe.")
+        return Compra(
+            IdPublico(fila.id),
+            IdPublico(dueno),
+            fila.pack_id,
+            fila.provider,
+            fila.provider_reference,
+            Dinero.desde_decimal(fila.amount_usd),
+            fila.credits,
+            ESTADOS[fila.status],
         )

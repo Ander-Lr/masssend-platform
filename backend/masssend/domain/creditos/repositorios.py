@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from masssend.domain.creditos.billetera import Billetera
+from masssend.domain.creditos.compra import Compra
 from masssend.domain.creditos.reserva import Reserva
 from masssend.domain.shared.identificadores import IdPublico
 
@@ -29,3 +30,15 @@ class IRepoReservas(Protocol):
     def ya_consumido(self, reserva_id: IdPublico, mensaje_id: IdPublico) -> bool: ...
 
     def registrar_consumo(self, reserva: Reserva, mensaje_id: IdPublico) -> None: ...
+
+
+class IRepoCompras(Protocol):
+    def agregar(self, compra: Compra) -> None: ...
+
+    def obtener(self, compra_id: IdPublico) -> Compra:
+        """Lanza RecursoNoEncontrado si no existe."""
+        ...
+
+    def bloquear(self, compra_id: IdPublico) -> Compra: ...
+
+    def guardar(self, compra: Compra, respuesta: dict[str, object]) -> None: ...

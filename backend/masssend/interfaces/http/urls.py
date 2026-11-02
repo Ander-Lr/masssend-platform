@@ -9,6 +9,7 @@ urlpatterns = [
     path("salud", SaludVista.as_view(), name="v1_salud"),
     path("", include("masssend.interfaces.http.identidad.urls")),
     path("", include("masssend.interfaces.http.creditos.urls")),
+    path("", include("masssend.interfaces.http.pagos.urls")),
     # Debe ser siempre la ultima: una ruta desconocida responde problem+json.
     re_path(r"^(?P<resto>.*)$", ruta_no_encontrada, name="v1_no_encontrada"),
 ]
