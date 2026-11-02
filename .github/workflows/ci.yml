@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secretos
+        working-directory: .
+        run: >
+          docker run --rm -v "$PWD":/repo zricethezav/gitleaks:v8.18.4
+          detect --source=/repo --no-banner --redact
+      - name: Lint, arquitectura y unitarias
+        run: make check
+      - name: Sistema actual
+        run: make test-legacy
+      - name: Gateway
+        run: make test-gateway
+      - name: Integracion
+        run: make test-int

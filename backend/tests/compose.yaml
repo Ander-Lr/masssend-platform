@@ -1,0 +1,31 @@
+# Entorno de integración, separado del proyecto: la base vive en memoria
+# y desaparece con make test-int. Las claves solo sirven aquí.
+name: masssend-tests
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: masssend_tests
+      POSTGRES_USER: masssend_tests
+      POSTGRES_PASSWORD: solo-pruebas
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U masssend_tests -d masssend_tests"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  pruebas:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile
+    environment:
+      DATABASE_URL: postgres://masssend_tests:solo-pruebas@postgres:5432/masssend_tests
+      DB_SSL_REQUIRE: "False"
+      DJANGO_SETTINGS_MODULE: core.settings
+    command: pytest tests/integration
+    depends_on:
+      postgres:
+        condition: service_healthy

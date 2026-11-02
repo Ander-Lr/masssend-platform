@@ -1,0 +1,20 @@
+# El dueño de cada zona revisa sus cambios. La última regla que coincide manda.
+*                                                @Ander-Lr
+
+# Carlos
+/backend/masssend/**/campanas/                   @herklox73
+/backend/masssend/**/envio/                      @herklox73
+/backend/masssend/infrastructure/adapters/mensajeria/ @herklox73
+/backend/masssend/infrastructure/adapters/cola/  @herklox73
+/backend/masssend/infrastructure/adapters/archivos/ @herklox73
+/backend/masssend/interfaces/workers/tareas_envio.py @herklox73
+/backend/whatsapp_api/                           @herklox73
+/postman/collections/03-*                        @herklox73
+/postman/collections/04-*                        @herklox73
+
+# Compartido: lo aprueban los dos
+/backend/masssend/domain/shared/                 @Ander-Lr @herklox73
+/backend/masssend/application/shared/            @Ander-Lr @herklox73
+/backend/tests/fakes/                            @Ander-Lr @herklox73
+**/puertos.py                                    @Ander-Lr @herklox73
+**/repositorios.py                               @Ander-Lr @herklox73
