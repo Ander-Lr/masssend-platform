@@ -1,0 +1,12 @@
+# Imagen solo para revisar el gateway. No lo arranca ni conecta con WhatsApp.
+#
+# Desde backend/:
+#   docker build -f tests/Dockerfile.gateway -t masssend-gateway-tests whatsapp_api
+#   docker run --rm masssend-gateway-tests
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY index.js .
+
+CMD ["node", "--check", "index.js"]
