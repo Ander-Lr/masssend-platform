@@ -1,6 +1,7 @@
 # Imagen solo para pruebas del backend. No se despliega.
+# Desde backend/ se usa con make check, make test-int y make test-legacy.
 #
-# Desde backend/:
+# La orden por defecto ejecuta las pruebas del sistema actual:
 #   docker build -f tests/Dockerfile -t masssend-tests .
 #   docker run --rm masssend-tests
 FROM python:3.11-slim
@@ -11,8 +12,9 @@ RUN apt-get update && apt-get install -y gcc libpq-dev \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --default-timeout=120 --retries=10 --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --default-timeout=120 --retries=10 --no-cache-dir \
+    -r requirements.txt -r requirements-dev.txt
 
 COPY . .
 

@@ -1,0 +1,89 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "TID251"]
+
+[tool.ruff.lint.per-file-ignores]
+# Aqui viven los adaptadores reales de reloj, azar e identificadores.
+"masssend/infrastructure/**" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"datetime.datetime.now".msg = "Usa el puerto IReloj."
+"datetime.datetime.utcnow".msg = "Usa el puerto IReloj."
+"time.sleep".msg = "El nucleo y las pruebas no esperan tiempo real."
+"random".msg = "Usa el puerto IAleatorio."
+"secrets".msg = "Usa el puerto IAleatorio."
+"uuid.uuid4".msg = "Usa el puerto IGeneradorIds."
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+explicit_package_bases = true
+mypy_path = "."
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "--import-mode=importlib"
+
+# El contrato de arquitectura: si alguno se rompe, make arch falla.
+[tool.importlinter]
+root_packages = ["masssend"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Las capas solo dependen hacia adentro"
+type = "layers"
+layers = [
+    "masssend.interfaces",
+    "masssend.infrastructure",
+    "masssend.application",
+    "masssend.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "El nucleo no depende de frameworks ni del legacy"
+type = "forbidden"
+source_modules = ["masssend.domain", "masssend.application"]
+forbidden_modules = [
+    "django",
+    "rest_framework",
+    "requests",
+    "httpx",
+    "redis",
+    "celery",
+    "pika",
+    "channels",
+    "pyotp",
+    "jwt",
+    "google",
+    "cryptography",
+    "mass_sender",
+    "email_auth",
+    "billing",
+    "core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Los modulos del dominio son independientes"
+type = "independence"
+modules = [
+    "masssend.domain.identidad",
+    "masssend.domain.creditos",
+    "masssend.domain.ia",
+    "masssend.domain.campanas",
+    "masssend.domain.envio",
+]
+
+[[tool.importlinter.contracts]]
+name = "Los modulos de aplicacion son independientes"
+type = "independence"
+modules = [
+    "masssend.application.identidad",
+    "masssend.application.creditos",
+    "masssend.application.ia",
+    "masssend.application.campanas",
+    "masssend.application.envio",
+]

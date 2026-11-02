@@ -1,0 +1,7 @@
+# Herramientas de calidad. No entran en la imagen de producción.
+import-linter==2.15
+mypy==2.4.1
+pytest==9.2.0
+pytest-cov==7.1.0
+pytest-django==4.14.0
+ruff==0.17.3
