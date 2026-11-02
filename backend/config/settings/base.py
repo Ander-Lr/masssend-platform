@@ -10,6 +10,7 @@ INSTALLED_APPS = [
     *INSTALLED_APPS,  # noqa: F405
     "rest_framework_simplejwt.token_blacklist",
     "masssend.infrastructure.persistence.identidad",
+    "masssend.infrastructure.persistence.creditos",
 ]
 
 ROOT_URLCONF = "config.urls"
