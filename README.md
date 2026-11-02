@@ -10,7 +10,7 @@ Desarrollado como proyecto de la asignatura **Arquitectura del Software**
 Sede Santo Domingo de los Tsáchilas  
 **Docente:** Ing. Kevin Jair Chuquitanco Velasco 
 **NRC:** 29888  
-**Estudiante:** Anderson Lenin Lara Chicaiza
+**Estudiante:** Anderson Lara, Carlos Calapucha
 
 ---
 
@@ -36,22 +36,42 @@ cp backend/.env.example backend/.env
 Completa `backend/.env` con valores propios. Compose exige además `POSTGRES_PASSWORD`, `WHATSAPP_WEBHOOK_TOKEN`, `PB_SUPERUSER_EMAIL` y `PB_SUPERUSER_PASSWORD`. Ese archivo nunca se sube al repositorio.
 
 ```bash
-docker compose --env-file backend/.env up --build -d
-docker compose --env-file backend/.env exec backend python manage.py createsuperuser
+docker compose --env-file backend/.env --profile real up --build -d
+docker compose --env-file backend/.env --profile real exec backend python manage.py createsuperuser
 ```
 
 El asistente de IA necesita descargar su modelo una sola vez:
 
 ```bash
-docker compose --env-file backend/.env exec ollama ollama pull qwen2.5:0.5b
+docker compose --env-file backend/.env --profile real exec ollama ollama pull qwen2.5:0.5b
 ```
 
 Para iniciar sesión se usa el nombre de usuario, no el correo, y se activa MFA con Google Authenticator.
 
 ## Pruebas
 
+Se ejecutan en contenedores, desde `backend/`. Solo requieren Docker y `make`.
+
+| Comando | Qué comprueba |
+|---------|---------------|
+| `make check` | Estilo, tipos, arquitectura y pruebas unitarias |
+| `make test-legacy` | Pruebas del sistema actual |
+| `make test-gateway` | Sintaxis del gateway, sin arrancarlo |
+| `make test-int` | Integración con PostgreSQL temporal |
+| `make e2e` | Colecciones de Postman con adaptadores falsos; requiere Postman CLI |
+
+## API v1
+
+La API se publica en `/api/v1/`. Para probarla en Postman sin WhatsApp, pagos ni correos reales:
+
 ```bash
-docker compose --env-file backend/.env exec backend python manage.py test
+docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci up --build -d
+```
+
+Importa `postman/environments/local.postman_environment.json` y las colecciones de `postman/collections/`. Los correos capturados se ven en http://localhost:8025. Para apagar y borrar los datos de prueba:
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci down -v
 ```
 
 ## Estructura

@@ -14,7 +14,7 @@ until python manage.py migrate --noinput; do
 done
 
 echo "==> Iniciando gunicorn en puerto 8000..."
-exec gunicorn core.wsgi:application \
+exec gunicorn config.wsgi:application \
     --bind 0.0.0.0:8000 \
     --workers 1 \
     --timeout 120 \

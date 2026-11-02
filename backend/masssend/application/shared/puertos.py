@@ -45,3 +45,12 @@ class IUnidadDeTrabajo(Protocol):
     def al_confirmar(self, accion: Callable[[], None]) -> None:
         """Agenda un efecto externo; solo se ejecuta si la transaccion confirma."""
         ...
+
+
+class IComprobadorDependencia(Protocol):
+    """Revisa un servicio. Si es requerido y falla, la API no esta disponible."""
+
+    nombre: str
+    requerida: bool
+
+    def comprobar(self) -> bool: ...

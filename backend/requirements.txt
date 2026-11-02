@@ -17,3 +17,6 @@ google-auth==2.29.0
 pyotp==2.9.0
 qrcode[pil]==7.4.2
 django-cors-headers==4.4.0
+
+# Cache de los limites de peticiones y cola de envios
+redis==5.2.1

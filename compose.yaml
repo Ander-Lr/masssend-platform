@@ -6,15 +6,48 @@
 #   backend ─→ whatsapp (Node:3001), ollama (11434), pocketbase (8080)
 #   whatsapp ─→ backend (webhooks autenticados) y pocketbase (archivos)
 #   solo el backend publica su puerto en el host
+#
+# Perfiles:
+#   real  sistema completo, con WhatsApp, Ollama, PocketBase y Gmail.
+#   ci    API con adaptadores falsos y datos temporales, para Postman.
+x-adaptadores-reales: &adaptadores-reales
+  CANAL_MENSAJERIA: whatsapp
+  COLA_ENVIOS: celery
+  ALMACEN_ARCHIVOS: pocketbase
+  GENERADOR_TEXTO: ollama
+  PASARELA_PAGO_FAKE: "0"
+  DESTINO_CORREO: gmail
+
+x-backend-ci: &backend-ci
+  build:
+    context: ./backend
+  environment:
+    SECRET_KEY: "${SECRET_KEY:?Define SECRET_KEY en el archivo de --env-file}"
+    JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Define JWT_SECRET_KEY en el archivo de --env-file}"
+    DATABASE_URL: "postgres://masssend_ci:solo-pruebas@postgres-ci:5432/masssend_ci"
+    DB_SSL_REQUIRE: "False"
+    DEBUG: "False"
+    REDIS_URL: "redis://redis:6379/0"
+    CANAL_MENSAJERIA: fake
+    COLA_ENVIOS: sincrona
+    ALMACEN_ARCHIVOS: memoria
+    GENERADOR_TEXTO: fake
+    PASARELA_PAGO_FAKE: "1"
+    DESTINO_CORREO: mailpit
+  networks:
+    - masssend_network
+  restart: unless-stopped
+
 services:
 
   # ── Backend Django (API, autenticación, campañas, pagos) ──────────
   backend:
+    profiles: [real]
     build:
       context: ./backend
     container_name: masssend-backend
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     env_file:
       - ./backend/.env
     environment:
@@ -25,12 +58,15 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
       DB_SSL_REQUIRE: "False"
       DEBUG: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      <<: *adaptadores-reales
     volumes:
       - ./backend/media:/app/media
     depends_on:
       - pocketbase
       - ollama
       - postgres
+      - redis
     networks:
       - masssend_network
     restart: unless-stopped
@@ -41,6 +77,7 @@ services:
   # (PENDING -> PROCESSING -> SENT/FAILED). Es un servicio aparte para
   # que un correo lento (SMTP) nunca bloquee la respuesta HTTP principal.
   email-worker:
+    profiles: [real]
     build:
       context: ./backend
     container_name: masssend-email-worker
@@ -54,6 +91,8 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
       DB_SSL_REQUIRE: "False"
       DEBUG: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      <<: *adaptadores-reales
     volumes:
       - ./backend/media:/app/media
     depends_on:
@@ -65,6 +104,7 @@ services:
 
   # ── Servicio WhatsApp (Node + Baileys, genera el QR) ──────────────
   whatsapp:
+    profiles: [real]
     build:
       context: ./backend/whatsapp_api
     container_name: masssend-whatsapp
@@ -81,6 +121,7 @@ services:
 
   # ── Modelo de IA local (asistente del sistema) ────────────────────
   ollama:
+    profiles: [real]
     image: ollama/ollama:latest
     container_name: masssend-ollama
     volumes:
@@ -91,6 +132,7 @@ services:
 
   # ── Almacenamiento de fotos/videos de campañas ────────────────────
   pocketbase:
+    profiles: [real]
     build:
       context: ./infra/pocketbase
       args:
@@ -107,6 +149,7 @@ services:
 
   # ── Base de datos PostgreSQL ──────────────────────────────────────
   postgres:
+    profiles: [real]
     image: postgres:15-alpine
     container_name: masssend-postgres
     environment:
@@ -115,6 +158,64 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}"
     volumes:
       - masssend_postgres_data:/var/lib/postgresql/data
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  # ── Redis: cache de los limites de peticiones y cola de envíos ───
+  redis:
+    image: redis:7.4-alpine
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  # ── Perfil ci: API con adaptadores falsos ─────────────────────────
+  backend-ci:
+    <<: *backend-ci
+    profiles: [ci]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen('http://localhost:8000/api/v1/salud', timeout=3)"
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    depends_on:
+      - postgres-ci
+      - redis
+      - mailpit
+
+  email-worker-ci:
+    <<: *backend-ci
+    profiles: [ci]
+    command: ["python", "manage.py", "process_email_queue"]
+    depends_on:
+      - backend-ci
+
+  # Datos en memoria: desaparecen al apagar y no tocan los datos reales.
+  postgres-ci:
+    profiles: [ci]
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: masssend_ci
+      POSTGRES_USER: masssend_ci
+      POSTGRES_PASSWORD: solo-pruebas
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  # Captura los correos; Postman lee los códigos desde su API.
+  mailpit:
+    profiles: [ci]
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
     networks:
       - masssend_network
     restart: unless-stopped
