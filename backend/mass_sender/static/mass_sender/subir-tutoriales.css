@@ -1,0 +1,759 @@
+/* ===================================================================
+   SUBIR TUTORIALES - YOUTUBE STYLE UPLOAD FORM
+
+/* === BASE LAYOUT === */
+.upload-tutorials-base {
+    overflow-x: hidden;
+}
+
+.upload-tutorials-main-container {
+    min-height: auto !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.upload-tutorials-content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* === HEADER SECTION === */
+.upload-tutorials-header {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.upload-tutorials-back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #f5f5f5;
+    color: #0f0f0f;
+    padding: 8px 16px;
+    border-radius: 24px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.upload-tutorials-back-button:hover {
+    background-color: #e0e0e0;
+    text-decoration: none;
+    color: #0f0f0f;
+}
+
+.upload-tutorials-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #0f0f0f;
+    margin: 0;
+    flex: 1;
+}
+
+/* === WHITE CONTAINER COMPONENT === */
+.upload-tutorials-section {
+    background: hsl(0 0% 100%);
+    border: 1px solid hsl(220 13% 91%);
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: all 0.2s ease-in-out;
+    margin-bottom: 1rem;
+}
+
+.upload-tutorials-section:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* === FORM CONTAINER === */
+.upload-tutorials-form-container {
+    width: 100%;
+}
+
+.upload-tutorials-form {
+    width: 100%;
+}
+
+.upload-tutorials-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.upload-tutorials-preview-column,
+.upload-tutorials-info-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* === SECTION TITLES === */
+.upload-tutorials-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #0f0f0f;
+    margin-bottom: 1rem;
+}
+
+.upload-tutorials-section-title svg {
+    color: #636468;
+}
+
+/* === VIDEO PREVIEW COMPONENT === */
+.upload-tutorials-video-preview {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background-color: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.upload-tutorials-video-preview:hover {
+    border-color: #adb5bd;
+}
+
+.upload-tutorials-video-preview iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.upload-tutorials-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.upload-tutorials-placeholder svg {
+    margin-bottom: 1rem;
+    opacity: 0.7;
+}
+
+.upload-tutorials-placeholder p {
+    margin: 0 0 0.5rem 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.upload-tutorials-placeholder small {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.upload-tutorials-placeholder--error {
+    color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.upload-tutorials-placeholder--error svg {
+    color: #dc3545;
+}
+
+/* === FORM COMPONENTS === */
+.upload-tutorials-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.upload-tutorials-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 0.375rem;
+    line-height: 1.5;
+}
+
+.upload-tutorials-label svg {
+    color: #636468;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.upload-tutorials-input,
+.upload-tutorials-select,
+.upload-tutorials-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.5;
+    background-color: #fff;
+    transition: all 0.15s ease-in-out;
+    font-family: inherit;
+}
+
+.upload-tutorials-input:focus,
+.upload-tutorials-select:focus,
+.upload-tutorials-textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.upload-tutorials-input--error,
+.upload-tutorials-select--error,
+.upload-tutorials-textarea--error {
+    border-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.upload-tutorials-input--error:focus,
+.upload-tutorials-select--error:focus,
+.upload-tutorials-textarea--error:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.upload-tutorials-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.upload-tutorials-select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* === CHARACTER COUNTER === */
+.upload-tutorials-char-counter {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+.upload-tutorials-char-counter--warning {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+/* === INPUT HELP TEXT === */
+.upload-tutorials-input-help {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+    margin-top: 0.25rem;
+}
+
+/* === FILE INPUT COMPONENT === */
+.upload-tutorials-file-input {
+    position: relative;
+}
+
+.upload-tutorials-file {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.upload-tutorials-file-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border: 1px dashed #d1d5db;
+    border-radius: 6px;
+    background-color: #f9fafb;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-decoration: none;
+}
+
+.upload-tutorials-file-label:hover {
+    border-color: #9ca3af;
+    background-color: #f3f4f6;
+    color: #374151;
+    text-decoration: none;
+}
+
+.upload-tutorials-file:focus + .upload-tutorials-file-label {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* === FORM ACTIONS === */
+.upload-tutorials-form-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    flex-wrap: wrap;
+}
+
+.upload-tutorials-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    border: 1px solid transparent;
+    min-width: auto;
+    height: 40px;
+}
+
+.upload-tutorials-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.upload-tutorials-button--primary {
+    background-color: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
+.upload-tutorials-button--primary:hover {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+    color: white;
+    text-decoration: none;
+}
+
+.upload-tutorials-button--secondary {
+    background-color: #6b7280;
+    color: white;
+    border-color: #6b7280;
+}
+
+.upload-tutorials-button--secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+    color: white;
+    text-decoration: none;
+}
+
+.upload-tutorials-button--preview {
+    background-color: #059669;
+    color: white;
+    border-color: #059669;
+}
+
+.upload-tutorials-button--preview:hover {
+    background-color: #047857;
+    border-color: #047857;
+    color: white;
+    text-decoration: none;
+}
+
+/* === RESPONSIVE DESIGN === */
+@media (max-width: 1024px) {
+    .upload-tutorials-form-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .upload-tutorials-preview-section {
+        position: static;
+        order: -1;
+    }
+}
+
+@media (max-width: 768px) {
+    .upload-tutorials-section {
+        padding: 1.5rem;
+    }
+    
+    .upload-tutorials-form-grid {
+        gap: 1.5rem;
+    }
+    
+    .upload-tutorials-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .upload-tutorials-title {
+        font-size: 20px;
+    }
+    
+    .upload-tutorials-form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .upload-tutorials-button {
+        justify-content: center;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .upload-tutorials-section {
+        padding: 1rem;
+    }
+    
+    .upload-tutorials-preview-column,
+    .upload-tutorials-info-column {
+        gap: 1rem;
+    }
+    
+    .upload-tutorials-section-title {
+        font-size: 16px;
+    }
+    
+    .upload-tutorials-placeholder {
+        padding: 1.5rem;
+    }
+    
+    .upload-tutorials-placeholder svg {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+/* === DARK THEME SUPPORT === */
+[data-bs-theme=dark] .upload-tutorials-section {
+    background: #212529;
+    border-color: hsl(240 3.7% 15.9%);
+}
+
+[data-bs-theme=dark] .upload-tutorials-title,
+[data-bs-theme=dark] .upload-tutorials-section-title {
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-back-button {
+    background-color: #272727;
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-back-button:hover {
+    background-color: #3f3f3f;
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-label {
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-input,
+[data-bs-theme=dark] .upload-tutorials-select,
+[data-bs-theme=dark] .upload-tutorials-textarea {
+    background-color: #2d3338;
+    border-color: #495057;
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-input:focus,
+[data-bs-theme=dark] .upload-tutorials-select:focus,
+[data-bs-theme=dark] .upload-tutorials-textarea:focus {
+    border-color: #3ea6ff;
+    box-shadow: 0 0 0 3px rgba(62, 166, 255, 0.1);
+}
+
+[data-bs-theme=dark] .upload-tutorials-input::placeholder,
+[data-bs-theme=dark] .upload-tutorials-textarea::placeholder {
+    color: #adb5bd;
+}
+
+[data-bs-theme=dark] .upload-tutorials-video-preview {
+    background-color: #2d3338;
+    border-color: #495057;
+}
+
+[data-bs-theme=dark] .upload-tutorials-placeholder {
+    color: #adb5bd;
+}
+
+[data-bs-theme=dark] .upload-tutorials-char-counter,
+[data-bs-theme=dark] .upload-tutorials-input-help {
+    color: #adb5bd;
+}
+
+[data-bs-theme=dark] .upload-tutorials-file-label {
+    background-color: #2d3338;
+    border-color: #495057;
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-file-label:hover {
+    background-color: #3f464d;
+    border-color: #6c757d;
+    color: #f1f1f1;
+}
+
+[data-bs-theme=dark] .upload-tutorials-form-actions {
+    border-top-color: #495057;
+}
+
+/* === LOADING STATES === */
+.upload-tutorials-button--loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.upload-tutorials-button--loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    color: white;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* === SUCCESS/ERROR STATES === */
+.upload-tutorials-success-message {
+    background-color: #d1edff;
+    border: 1px solid #0066cc;
+    color: #0052a3;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.upload-tutorials-error-message {
+    background-color: #f8d7da;
+    border: 1px solid #dc3545;
+    color: #721c24;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+[data-bs-theme=dark] .upload-tutorials-success-message {
+    background-color: #1a3a52;
+    border-color: #3ea6ff;
+    color: #87ceeb;
+}
+
+[data-bs-theme=dark] .upload-tutorials-error-message {
+    background-color: #4a1e1e;
+    border-color: #dc3545;
+    color: #f5b7b1;
+}
+
+/* === ACCESSIBILITY IMPROVEMENTS === */
+.upload-tutorials-input:invalid,
+.upload-tutorials-select:invalid,
+.upload-tutorials-textarea:invalid {
+    border-color: #dc3545;
+}
+
+.upload-tutorials-form-group:focus-within .upload-tutorials-label {
+    color: #0066cc;
+}
+
+[data-bs-theme=dark] .upload-tutorials-form-group:focus-within .upload-tutorials-label {
+    color: #3ea6ff;
+}
+
+/* === ANIMATIONS === */
+.upload-tutorials-section {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========== FONDO WELCOME SCREEN (no tocar .bg-primary-soft) ========== */
+.welcome-screen-bg {
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(var(--bs-primary-rgb), 0.08) 0%,
+        rgba(var(--bs-primary-rgb), 0.15) 50%,
+        rgba(var(--bs-primary-rgb), 0.08) 100%);
+    overflow: hidden;
+}
+
+/* Círculo grande superior derecha */
+.welcome-screen-bg::before {
+    content: '';
+    position: absolute;
+    top: -15%;
+    right: -10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, 
+        rgba(var(--bs-primary-rgb), 0.15) 0%, 
+        rgba(var(--bs-primary-rgb), 0.08) 40%,
+        transparent 70%);
+    border-radius: 50%;
+    filter: blur(40px);
+}
+
+/* Círculo medio inferior izquierda */
+.welcome-screen-bg::after {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    left: -15%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, 
+        rgba(var(--bs-primary-rgb), 0.12) 0%, 
+        rgba(var(--bs-primary-rgb), 0.06) 50%,
+        transparent 70%);
+    border-radius: 50%;
+    filter: blur(50px);
+}
+
+/* Círculo pequeño superior izquierda */
+.welcome-content-box::before {
+    content: '';
+    position: absolute;
+    top: 10%;
+    left: 5%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, 
+        rgba(var(--bs-primary-rgb), 0.1) 0%, 
+        transparent 60%);
+    border-radius: 50%;
+    filter: blur(30px);
+    z-index: -1;
+}
+
+/* Círculo decorativo centro derecha */
+.welcome-content-box::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -5%;
+    width: 250px;
+    height: 250px;
+    background: radial-gradient(circle, 
+        rgba(var(--bs-primary-rgb), 0.08) 0%, 
+        transparent 65%);
+    border-radius: 50%;
+    filter: blur(35px);
+    z-index: -1;
+}
+
+/* ========== AVIONCITO DE PAPEL ANIMADO ========== */
+.paper-plane-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.paper-plane {
+    position: absolute;
+    color: rgba(var(--bs-primary-rgb), 0.3);
+    filter: drop-shadow(0 2px 8px rgba(var(--bs-primary-rgb), 0.2));
+    animation: flyPlane 15s ease-in-out infinite;
+}
+
+@keyframes flyPlane {
+    0% {
+        top: -5%;
+        left: -5%;
+        transform: rotate(-15deg) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    25% {
+        top: 20%;
+        left: 30%;
+        transform: rotate(5deg) scale(1);
+    }
+    50% {
+        top: 45%;
+        left: 65%;
+        transform: rotate(-8deg) scale(0.95);
+    }
+    75% {
+        top: 25%;
+        left: 85%;
+        transform: rotate(10deg) scale(1.05);
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        top: -5%;
+        left: 105%;
+        transform: rotate(-20deg) scale(0.7);
+        opacity: 0;
+    }
+}
+
+/* Variación para múltiples aviones (opcional) */
+.paper-plane:nth-child(2) {
+    animation-delay: 7s;
+    animation-duration: 18s;
+}
+
+/* Efecto hover sutil en el área de bienvenida */
+.welcome-content-box {
+    position: relative;
+    z-index: 2;
+}

@@ -1,0 +1,1070 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Importar Contactos — {{ site_title }}{% endblock %}
+
+{% block content %}
+<style>
+    .import-container { max-width: 700px; margin: 0 auto; }
+    .import-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 28px 32px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+    .import-card h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
+    .import-card p  { color: #555; font-size: 0.9rem; margin-bottom: 20px; }
+
+    .drop-zone {
+        border: 2px dashed #9b59b6;
+        border-radius: 10px;
+        padding: 36px 20px;
+        text-align: center;
+        background: #faf5ff;
+        cursor: pointer;
+        transition: all 0.25s;
+        margin-bottom: 18px;
+    }
+    .drop-zone:hover, .drop-zone.active { background: #f3e8ff; border-color: #7c3aed; }
+    .drop-zone svg { color: #9b59b6; margin-bottom: 10px; }
+    .drop-zone p { color: #6b21a8; font-weight: 600; margin: 0; font-size: 0.95rem; }
+    .drop-zone small { color: #888; font-size: 0.8rem; }
+
+    .csv-format-box {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 14px 18px;
+        font-family: monospace;
+        font-size: 0.82rem;
+        color: #333;
+        margin-bottom: 16px;
+    }
+
+    .btn-import {
+        background: #7c3aed;
+        color: #fff;
+        border: none;
+        padding: 10px 28px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-import:hover    { background: #6d28d9; }
+    .btn-import:disabled { background: #ccc; cursor: not-allowed; }
+
+    .btn-download {
+        background: transparent;
+        border: 1px solid #9b59b6;
+        color: #7c3aed;
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 10px;
+        transition: all 0.2s;
+    }
+    .btn-download:hover { background: #f3e8ff; }
+
+    .alert-success { background: #d1fae5; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: #065f46; }
+    .alert-error   { background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: #991b1b; }
+    .alert-warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: #92400e; }
+
+    #fileName { font-size: 0.85rem; color: #7c3aed; font-weight: 600; margin-top: 6px; display: none; }
+
+    .result-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 12px; }
+    .result-table th { background: #f3e8ff; color: #6b21a8; padding: 8px 12px; text-align: left; }
+    .result-table td { padding: 7px 12px; border-bottom: 1px solid #f0e8ff; }
+    .result-table tr:hover td { background: #faf5ff; }
+
+    .badge-ok  { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .badge-dup { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .badge-err { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+
+    /* ══ MODAL ═══════════════════════════════════════════════════════════ */
+    .csv-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(15,12,35,.55);
+        backdrop-filter: blur(3px);
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        opacity: 0; pointer-events: none;
+        transition: opacity .22s ease;
+    }
+    .csv-overlay.open { opacity: 1; pointer-events: all; }
+
+    .csv-modal {
+        background: #fff;
+        border-radius: 16px;
+        width: 100%; max-width: 900px;
+        max-height: 88vh;
+        display: flex; flex-direction: column;
+        box-shadow: 0 24px 60px rgba(0,0,0,.22);
+        transform: translateY(18px);
+        transition: transform .22s ease;
+        overflow: hidden;
+    }
+    .csv-overlay.open .csv-modal { transform: translateY(0); }
+
+    /* Cabecera modal */
+    .csv-modal-head {
+        padding: 20px 24px 16px;
+        border-bottom: 1px solid #f0e8ff;
+        display: flex; align-items: center; justify-content: space-between;
+        flex-shrink: 0;
+    }
+    .csv-modal-head h3 {
+        font-size: 1.05rem; font-weight: 800; color: #1e1b4b; margin: 0;
+    }
+    .csv-modal-head small { color: #6b7280; font-size: 0.78rem; font-weight: 400; }
+    .csv-close-btn {
+        width: 32px; height: 32px; border-radius: 8px;
+        border: none; background: #f3f4f6; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        color: #6b7280; transition: background .15s, color .15s;
+    }
+    .csv-close-btn:hover { background: #fee2e2; color: #dc2626; }
+
+    /* Mapeo de columnas */
+    .csv-mapping-bar {
+        padding: 14px 24px;
+        background: #faf5ff;
+        border-bottom: 1px solid #f0e8ff;
+        flex-shrink: 0;
+    }
+    .csv-mapping-bar p {
+        font-size: 0.78rem; font-weight: 700; color: #6b21a8;
+        text-transform: uppercase; letter-spacing: .04em;
+        margin: 0 0 10px 0;
+    }
+    .csv-mapping-cols {
+        display: flex; flex-wrap: wrap; gap: 10px;
+    }
+    .csv-col-map {
+        display: flex; flex-direction: column; gap: 4px;
+        min-width: 140px; flex: 1;
+    }
+    .csv-col-map label {
+        font-size: 0.72rem; color: #6b7280; font-weight: 600;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .csv-col-map select {
+        padding: 6px 10px;
+        border: 1.5px solid #ddd6fe;
+        border-radius: 7px;
+        font-size: 0.82rem;
+        color: #374151;
+        background: #fff;
+        cursor: pointer;
+        outline: none;
+        transition: border-color .15s;
+    }
+    .csv-col-map select:focus { border-color: #7c3aed; }
+    .csv-col-map select.mapped-phone    { border-color: #10b981; background: #f0fdf4; }
+    .csv-col-map select.mapped-nombre   { border-color: #3b82f6; background: #eff6ff; }
+    .csv-col-map select.mapped-etiquetas{ border-color: #f59e0b; background: #fffbeb; }
+    .csv-col-map select.mapped-notas    { border-color: #8b5cf6; background: #f5f3ff; }
+    .csv-col-map select.mapped-skip     { border-color: #d1d5db; background: #f9fafb; color: #9ca3af; }
+
+    /* Toolbar selección */
+    .csv-table-toolbar {
+        padding: 10px 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        border-bottom: 1px solid #f3f4f6;
+        flex-shrink: 0;
+    }
+    .csv-select-all-btn {
+        display: flex; align-items: center; gap: 7px;
+        font-size: 0.83rem; font-weight: 600; color: #374151;
+        background: none; border: none; cursor: pointer;
+        padding: 5px 10px; border-radius: 7px;
+        transition: background .15s;
+    }
+    .csv-select-all-btn:hover { background: #f3f4f6; }
+    .csv-select-all-btn .chk-box {
+        width: 16px; height: 16px;
+        border: 2px solid #7c3aed; border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        transition: background .15s;
+    }
+    .csv-select-all-btn.all-checked .chk-box { background: #7c3aed; }
+    #csvSelCount { font-size: 0.82rem; color: #6b7280; }
+
+    /* Tabla de datos */
+    .csv-table-wrap {
+        overflow-y: auto;
+        flex: 1;
+    }
+    .csv-preview-table {
+        width: 100%; border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+    .csv-preview-table thead th {
+        position: sticky; top: 0;
+        background: #f5f3ff; color: #6b21a8;
+        font-weight: 700; font-size: 0.73rem;
+        text-transform: uppercase; letter-spacing: .03em;
+        padding: 9px 12px; text-align: left;
+        border-bottom: 2px solid #ddd6fe;
+        white-space: nowrap;
+    }
+    .csv-preview-table thead th:first-child { width: 40px; text-align: center; }
+    .csv-preview-table tbody tr { transition: background .1s; }
+    .csv-preview-table tbody tr:hover { background: #faf5ff; }
+    .csv-preview-table tbody tr.row-deselected { opacity: .4; }
+    .csv-preview-table tbody td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #f3f4f6;
+        color: #374151;
+        max-width: 200px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .csv-preview-table tbody td:first-child { text-align: center; }
+    .csv-row-check {
+        width: 16px; height: 16px;
+        accent-color: #7c3aed;
+        cursor: pointer;
+    }
+
+    /* Pie modal */
+    .csv-modal-foot {
+        padding: 14px 24px;
+        border-top: 1px solid #f0e8ff;
+        display: flex; align-items: center; justify-content: space-between;
+        flex-shrink: 0;
+        background: #fff;
+    }
+    .csv-modal-foot-info { font-size: 0.82rem; color: #6b7280; }
+    .csv-modal-foot-info strong { color: #7c3aed; }
+    .csv-foot-btns { display: flex; gap: 10px; }
+    .csv-btn-cancel {
+        padding: 9px 20px; border-radius: 8px;
+        border: 1.5px solid #e5e7eb; background: #fff;
+        font-size: 0.85rem; font-weight: 600; color: #374151;
+        cursor: pointer; transition: background .15s;
+    }
+    .csv-btn-cancel:hover { background: #f9fafb; }
+    .csv-btn-confirm {
+        padding: 9px 22px; border-radius: 8px;
+        border: none; background: #7c3aed;
+        font-size: 0.85rem; font-weight: 700; color: #fff;
+        cursor: pointer; transition: background .15s;
+        white-space: nowrap;
+    }
+    .csv-btn-confirm:hover    { background: #6d28d9; }
+    .csv-btn-confirm:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+    /* Fila de numero detectado */
+    .td-phone { font-family: monospace; color: #1e1b4b; font-weight: 600; }
+    .td-empty  { color: #d1d5db; font-style: italic; }
+</style>
+
+<!-- ═══ MODAL CSV PREVIEW ═══════════════════════════════════════════════ -->
+<div class="csv-overlay" id="csvOverlay">
+    <div class="csv-modal" id="csvModal">
+
+        <!-- Cabecera -->
+        <div class="csv-modal-head">
+            <div>
+                <h3>Vista previa del archivo</h3>
+                <small id="csvModalSubtitle">Cargando...</small>
+            </div>
+            <button class="csv-close-btn" onclick="cerrarModal()" title="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mapeo de columnas -->
+        <div class="csv-mapping-bar">
+            <p>Asigna cada columna del CSV a un campo</p>
+            <div class="csv-mapping-cols" id="csvMappingCols"></div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="csv-table-toolbar">
+            <button class="csv-select-all-btn" id="btnSelectAll" onclick="toggleSelectAll()">
+                <div class="chk-box" id="selectAllBox">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:none;" id="selectAllCheck">
+                        <path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                Seleccionar todo
+            </button>
+            <span id="csvSelCount">0 de 0 filas seleccionadas</span>
+        </div>
+
+        <!-- Tabla -->
+        <div class="csv-table-wrap">
+            <table class="csv-preview-table">
+                <thead id="csvTableHead"></thead>
+                <tbody id="csvTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Pie -->
+        <div class="csv-modal-foot">
+            <div class="csv-modal-foot-info">
+                <strong id="footSelCount">0</strong> contactos listos para importar
+            </div>
+            <div class="csv-foot-btns">
+                <button class="csv-btn-cancel" onclick="cerrarModal()">Cancelar</button>
+                <button class="csv-btn-confirm" id="btnConfirmImport" onclick="confirmarImportacion()">
+                    Importar contactos
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Formulario oculto que se envía al confirmar -->
+<form method="post" id="hiddenImportForm" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="contacts_json" id="contactsJsonInput">
+</form>
+
+<!-- ═══ CONTENIDO PRINCIPAL ══════════════════════════════════════════════ -->
+<div class="import-container">
+    <h1 style="font-size:1.3rem; font-weight:800; margin-bottom:20px;">
+        Importar Contactos desde CSV
+    </h1>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {% if result %}
+
+    <!-- ══ BARRA STICKY — siempre visible al hacer scroll ══════════════ -->
+    <div id="resultStickyBar" style="
+        position: sticky; top: 0; z-index: 200;
+        background: #fff;
+        border-bottom: 2px solid #ede9fe;
+        box-shadow: 0 2px 12px rgba(124,58,237,.10);
+        padding: 10px 16px;
+        margin-bottom: 20px;
+        border-radius: 0 0 10px 10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; max-width:700px; margin:0 auto;">
+
+            <!-- Mini-stats -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <span style="font-size:0.78rem; font-weight:700; color:#6b21a8; margin-right:4px;">Resultado:</span>
+                <span style="background:#d1fae5; color:#065f46; padding:3px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                    ✓ {{ result.creados }} nuevos
+                </span>
+                <span style="background:#fef3c7; color:#92400e; padding:3px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                    ↻ {{ result.actualizados }} actualizados
+                </span>
+                {% if result.errores > 0 %}
+                <span style="background:#fee2e2; color:#991b1b; padding:3px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                    ✗ {{ result.errores }} errores
+                </span>
+                {% endif %}
+                <span style="background:#f3e8ff; color:#6b21a8; padding:3px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                    {{ result.total }} total
+                </span>
+            </div>
+
+            <!-- Botones de acción -->
+            <div style="display:flex; gap:8px; flex-shrink:0;">
+                <a href="{% url 'admin:mass_sender_contact_changelist' %}" class="btn-import"
+                   style="text-decoration:none; padding:8px 20px; font-size:0.85rem;">
+                    Ver contactos
+                </a>
+                <a href="/admin/import-contacts/" class="btn-download"
+                   style="padding:8px 16px; font-size:0.85rem;">
+                    Importar otro
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ TARJETA RESULTADO ══════════════════════════════════════════ -->
+    <div class="import-card" style="padding-top:16px;">
+        <h2 style="margin-bottom:16px;">Detalle de la importación</h2>
+
+        {% if result.detalle %}
+
+        <!-- Toolbar: selector de filas + contador -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    flex-wrap:wrap; gap:10px; margin-bottom:10px;
+                    padding:10px 14px; background:#faf5ff;
+                    border-radius:8px; border:1px solid #ede9fe;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <label style="font-size:0.82rem; font-weight:600; color:#374151;">Mostrar</label>
+                <select id="pageSizeSelect"
+                        onchange="cambiarPagina(1)"
+                        style="padding:5px 10px; border:1.5px solid #ddd6fe; border-radius:7px;
+                               font-size:0.82rem; color:#374151; background:#fff; cursor:pointer;">
+                    <option value="10">10 por página</option>
+                    <option value="25" selected>25 por página</option>
+                    <option value="50">50 por página</option>
+                    <option value="100">100 por página</option>
+                    <option value="500">500 por página</option>
+                    <option value="9999999">Todos</option>
+                </select>
+            </div>
+            <span id="pageInfo" style="font-size:0.82rem; color:#6b7280; font-weight:600;"></span>
+        </div>
+
+        <!-- Tabla paginada -->
+        <div style="overflow-x:auto;">
+            <table class="result-table" id="resultTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Teléfono</th>
+                        <th>Nombre</th>
+                        <th>Estado</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody id="resultTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        <div id="paginationBar"
+             style="display:flex; align-items:center; justify-content:center;
+                    gap:6px; margin-top:14px; flex-wrap:wrap;">
+        </div>
+
+        <!-- Datos de filas como JSON para JS -->
+        <script id="resultDataJson" type="application/json">
+        [{% for fila in result.detalle %}{"fila":{{ fila.fila }},"telefono":"{{ fila.telefono }}","nombre":"{{ fila.nombre|escapejs }}","estado":"{{ fila.estado }}","mensaje":"{{ fila.mensaje|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+        </script>
+
+        {% else %}
+        <p style="color:#888;">No hay detalle disponible.</p>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <!-- FORMULARIO -->
+    <div class="import-card">
+        <h2>Subir archivo CSV</h2>
+        <p>Sube tu archivo con los contactos. El sistema te mostrara una vista previa para que elijas que datos importar.</p>
+
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvFile').click()">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            <p>Arrastra tu CSV aqui o haz clic para seleccionar</p>
+            <small>Formatos: .csv — maximo 5MB</small>
+            <div id="fileName"></div>
+        </div>
+
+        <input type="file" id="csvFile" name="csv_file" accept=".csv,.txt" style="display:none;" onchange="alSeleccionarArchivo(this)">
+
+        <div style="margin-bottom:18px;">
+            <label style="font-size:0.85rem; font-weight:600; color:#333; display:block; margin-bottom:6px;">
+                Separador de columnas
+            </label>
+            <select id="separatorSelect" style="padding:6px 12px; border:1px solid #ddd; border-radius:6px; font-size:0.85rem;">
+                <option value=",">Coma ( , ) — estandar</option>
+                <option value=";">Punto y coma ( ; ) — Excel Espana/Ecuador</option>
+                <option value="|">Pipe ( | )</option>
+                <option value="&#9;">Tabulador</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:20px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" id="skipHeaderCheck" checked style="width:16px; height:16px;">
+                <span>La primera fila es encabezado (saltar para datos, usar para nombres de columna)</span>
+            </label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button type="button" class="btn-import" id="btnSubmit" disabled onclick="abrirPreview()">
+                Vista previa e importar
+            </button>
+            <a href="#" onclick="descargarPlantilla()" class="btn-download">
+                Descargar plantilla CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Formato -->
+    <div class="import-card">
+        <h2>Formato esperado del CSV</h2>
+        <p>El archivo debe tener las columnas en este orden (el encabezado es opcional):</p>
+
+        <div class="csv-format-box">
+telefono,nombre,etiquetas,notas<br>
+593998765432,Juan Perez,cliente,Interesado en producto A<br>
+593987654321,Maria Lopez,lead,<br>
+593976543210,Carlos Rios,cliente lead,Cliente VIP<br>
+        </div>
+
+        <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+            <thead>
+                <tr style="background:#f3e8ff;">
+                    <th style="padding:8px 12px; text-align:left; color:#6b21a8;">Columna</th>
+                    <th style="padding:8px 12px; text-align:left; color:#6b21a8;">Requerida</th>
+                    <th style="padding:8px 12px; text-align:left; color:#6b21a8;">Descripcion</th>
+                    <th style="padding:8px 12px; text-align:left; color:#6b21a8;">Ejemplo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td style="padding:7px 12px;">telefono</td><td>Si</td><td>Numero con codigo de pais</td><td>593998765432</td></tr>
+                <tr><td style="padding:7px 12px;">nombre</td><td>Opcional</td><td>Nombre completo del contacto</td><td>Juan Perez</td></tr>
+                <tr><td style="padding:7px 12px;">etiquetas</td><td>Opcional</td><td>Para segmentar campanas</td><td>cliente, lead</td></tr>
+                <tr><td style="padding:7px 12px;">notas</td><td>Opcional</td><td>Informacion adicional</td><td>Interesado en X</td></tr>
+            </tbody>
+        </table>
+
+        <div class="alert-warning" style="margin-top:14px;">
+            <strong>Importante:</strong> El numero debe incluir el codigo de pais sin el + (ej: 593999... para Ecuador). Si el contacto ya existe, se actualizara el nombre y etiquetas.
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// ═══ Estado global ════════════════════════════════════════════════════════
+let csvParsed   = null;   // { headers: [], rows: [[...]] }
+let csvFile     = null;
+let allSelected = true;
+
+// ═══ Auto-detección de columnas ══════════════════════════════════════════
+const FIELD_MAP = {
+    telefono:  ['telefono','phone','cel','celular','numero','number','movil','mobile','fono','whatsapp','wp'],
+    nombre:    ['nombre','name','apellido','cliente','contacto','fullname','full_name','nombres'],
+    etiquetas: ['etiqueta','etiquetas','tag','tags','label','labels','categoria','group','grupo'],
+    notas:     ['nota','notas','note','notes','comentario','observacion','descripcion','info'],
+};
+
+function detectField(header) {
+    const h = header.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    for (const [field, aliases] of Object.entries(FIELD_MAP)) {
+        if (aliases.some(a => h.includes(a))) return field;
+    }
+    return 'skip';
+}
+
+function detectByPosition(colIndex) {
+    const byPos = ['telefono', 'nombre', 'etiquetas', 'notas'];
+    return byPos[colIndex] || 'skip';
+}
+
+// ═══ Parsear CSV ═════════════════════════════════════════════════════════
+function parsearCSV(text, separator) {
+    const lines  = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    const rows   = lines.map(line => parsearLinea(line, separator));
+    return rows;
+}
+
+function parsearLinea(line, sep) {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { inQ = !inQ; continue; }
+        if (c === sep && !inQ) { cols.push(cur); cur = ''; continue; }
+        cur += c;
+    }
+    cols.push(cur);
+    return cols.map(c => c.trim());
+}
+
+// ═══ Leer archivo y abrir modal ══════════════════════════════════════════
+function alSeleccionarArchivo(input) {
+    const fn  = document.getElementById('fileName');
+    const btn = document.getElementById('btnSubmit');
+    if (input.files.length > 0) {
+        csvFile = input.files[0];
+        fn.textContent = csvFile.name;
+        fn.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('dropZone').style.borderColor = '#7c3aed';
+        document.getElementById('dropZone').style.background  = '#f3e8ff';
+    }
+}
+
+function abrirPreview() {
+    if (!csvFile) return;
+    const sep        = document.getElementById('separatorSelect').value;
+    const skipHeader = document.getElementById('skipHeaderCheck').checked;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const allRows = parsearCSV(text, sep);
+        if (!allRows.length) return alert('El archivo está vacío.');
+
+        let headers, dataRows;
+        if (skipHeader) {
+            headers  = allRows[0];
+            dataRows = allRows.slice(1);
+        } else {
+            const maxCols = Math.max(...allRows.map(r => r.length));
+            headers  = Array.from({length: maxCols}, (_, i) => 'Columna ' + (i+1));
+            dataRows = allRows;
+        }
+
+        csvParsed = { headers, rows: dataRows.map((r, i) => ({id: i, cols: r, selected: true})) };
+        construirModal();
+        document.getElementById('csvOverlay').classList.add('open');
+    };
+    reader.readAsText(csvFile, 'UTF-8');
+}
+
+// ═══ Construir modal ═════════════════════════════════════════════════════
+function construirModal() {
+    const { headers, rows } = csvParsed;
+
+    // Subtítulo
+    document.getElementById('csvModalSubtitle').textContent =
+        csvFile.name + '  ·  ' + rows.length.toLocaleString('es') + ' filas encontradas';
+
+    // Mapeo de columnas
+    const mappingCont = document.getElementById('csvMappingCols');
+    mappingCont.innerHTML = '';
+    headers.forEach((h, i) => {
+        const field = headers.length === 1 ? 'telefono'
+                    : document.getElementById('skipHeaderCheck').checked
+                        ? detectField(h) : detectByPosition(i);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'csv-col-map';
+
+        const lbl = document.createElement('label');
+        lbl.textContent = h || ('Col ' + (i+1));
+        lbl.title = h;
+
+        const sel = document.createElement('select');
+        sel.id = 'mapCol_' + i;
+        sel.dataset.colIndex = i;
+        [
+            ['telefono',  'Telefono (requerido)'],
+            ['nombre',    'Nombre'],
+            ['etiquetas', 'Etiquetas'],
+            ['notas',     'Notas'],
+            ['skip',      'No importar'],
+        ].forEach(([val, txt]) => {
+            const opt = new Option(txt, val, val === field, val === field);
+            sel.appendChild(opt);
+        });
+        sel.className = 'mapped-' + field;
+        sel.addEventListener('change', function() {
+            const newField = this.value;
+            // Impedir que dos columnas mapeen al mismo campo (excepto "skip")
+            if (newField !== 'skip') {
+                document.querySelectorAll('.csv-col-map select').forEach(other => {
+                    if (other !== this && other.value === newField) {
+                        other.value = 'skip';
+                        other.className = 'mapped-skip';
+                    }
+                });
+            }
+            this.className = 'mapped-' + newField;
+            validarMapeo();
+            refrescarTabla();
+        });
+
+        wrap.appendChild(lbl);
+        wrap.appendChild(sel);
+        mappingCont.appendChild(wrap);
+    });
+
+    refrescarTabla();
+    actualizarContadores();
+    validarMapeo();
+}
+
+function getMappings() {
+    const m = {};
+    csvParsed.headers.forEach((_, i) => {
+        const sel = document.getElementById('mapCol_' + i);
+        if (sel) m[i] = sel.value;
+    });
+    return m;
+}
+
+function validarMapeo() {
+    const mappings   = getMappings();
+    const hayTel     = Object.values(mappings).includes('telefono');
+    const warning    = document.getElementById('mappingWarning');
+    const confirmBtn = document.getElementById('btnConfirmImport');
+
+    if (!hayTel) {
+        if (!warning) {
+            const w = document.createElement('div');
+            w.id = 'mappingWarning';
+            w.style.cssText = [
+                'margin:10px 0 0 0', 'padding:10px 14px',
+                'background:#fef3c7', 'border:1.5px solid #fbbf24',
+                'border-radius:8px', 'font-size:.81rem',
+                'color:#92400e', 'font-weight:600',
+                'display:flex', 'align-items:center', 'gap:8px',
+            ].join(';');
+            w.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Debes asignar al menos una columna como <strong style="margin-left:3px;">Telefono (requerido)</strong>';
+            document.getElementById('csvMappingCols').after(w);
+        }
+        confirmBtn.disabled = true;
+    } else {
+        const existing = document.getElementById('mappingWarning');
+        if (existing) existing.remove();
+        // Re-evaluar si hay filas seleccionadas
+        actualizarContadores();
+    }
+}
+
+function refrescarTabla() {
+    const mappings = getMappings();
+    const fields   = ['telefono','nombre','etiquetas','notas'];
+
+    // Cabecera
+    const thead = document.getElementById('csvTableHead');
+    const theadRow = thead.querySelector('tr') || document.createElement('tr');
+    theadRow.innerHTML = '<th></th>';
+    fields.forEach(f => {
+        const labels = {telefono:'Telefono', nombre:'Nombre', etiquetas:'Etiquetas', notas:'Notas'};
+        const colIdx = Object.entries(mappings).find(([,v]) => v === f)?.[0];
+        const th = document.createElement('th');
+        th.textContent = labels[f] + (colIdx !== undefined ? ' (col '+(+colIdx+1)+')' : ' —');
+        th.style.opacity = colIdx !== undefined ? '1' : '0.4';
+        theadRow.appendChild(th);
+    });
+    if (!thead.querySelector('tr')) thead.appendChild(theadRow);
+
+    // Filas
+    const tbody = document.getElementById('csvTableBody');
+    tbody.innerHTML = '';
+
+    csvParsed.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        if (!row.selected) tr.classList.add('row-deselected');
+
+        // Checkbox
+        const tdChk = document.createElement('td');
+        const chk   = document.createElement('input');
+        chk.type    = 'checkbox';
+        chk.className = 'csv-row-check';
+        chk.checked = row.selected;
+        chk.addEventListener('change', function() {
+            row.selected = this.checked;
+            tr.classList.toggle('row-deselected', !this.checked);
+            actualizarContadores();
+        });
+        tdChk.appendChild(chk);
+        tr.appendChild(tdChk);
+
+        // Celdas mapeadas
+        fields.forEach(f => {
+            const td = document.createElement('td');
+            const colIdx = Object.entries(mappings).find(([,v]) => v === f)?.[0];
+            const val = colIdx !== undefined ? (row.cols[+colIdx] || '') : '';
+            if (!val) {
+                td.innerHTML = '<span class="td-empty">—</span>';
+            } else {
+                td.textContent = val;
+                if (f === 'telefono') td.className = 'td-phone';
+            }
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+}
+
+function actualizarContadores() {
+    const sel   = csvParsed.rows.filter(r => r.selected).length;
+    const total = csvParsed.rows.length;
+    document.getElementById('csvSelCount').textContent =
+        sel.toLocaleString('es') + ' de ' + total.toLocaleString('es') + ' filas seleccionadas';
+    document.getElementById('footSelCount').textContent = sel.toLocaleString('es');
+    document.getElementById('btnConfirmImport').disabled = sel === 0;
+
+    const allBtn   = document.getElementById('btnSelectAll');
+    const checkSvg = document.getElementById('selectAllCheck');
+    allSelected = sel === total;
+    allBtn.classList.toggle('all-checked', allSelected);
+    checkSvg.style.display = allSelected ? 'block' : 'none';
+}
+
+function toggleSelectAll() {
+    allSelected = !allSelected;
+    csvParsed.rows.forEach(r => r.selected = allSelected);
+    refrescarTabla();
+    actualizarContadores();
+}
+
+// ═══ Confirmar importación ═══════════════════════════════════════════════
+function confirmarImportacion() {
+    const mappings = getMappings();
+
+    // Validar que exista columna de teléfono
+    if (!Object.values(mappings).includes('telefono')) {
+        validarMapeo();
+        return;
+    }
+
+    const selRows = csvParsed.rows.filter(r => r.selected);
+    if (selRows.length === 0) return;
+
+    const contacts = selRows.map(row => {
+        const obj = {};
+        Object.entries(mappings).forEach(([colIdx, field]) => {
+            // Cada campo se asigna desde UNA sola columna (no concatenar)
+            if (field !== 'skip' && !obj[field]) {
+                obj[field] = (row.cols[+colIdx] || '').trim();
+            }
+        });
+        return obj;
+    });
+
+    // Mostrar spinner de importación
+    mostrarSpinnerImport(selRows.length);
+
+    document.getElementById('contactsJsonInput').value = JSON.stringify(contacts);
+    document.getElementById('hiddenImportForm').submit();
+}
+
+function mostrarSpinnerImport(total) {
+    // Crear overlay de carga
+    const overlay = document.createElement('div');
+    overlay.id = 'importSpinnerOverlay';
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:99999',
+        'background:rgba(15,12,35,.6)', 'backdrop-filter:blur(4px)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+    ].join(';');
+
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:20px;padding:40px 48px;
+                    text-align:center;max-width:340px;width:90%;
+                    box-shadow:0 24px 60px rgba(0,0,0,.25);">
+            <div style="position:relative;width:64px;height:64px;margin:0 auto 24px;">
+                <svg style="animation:spin-import 1s linear infinite;width:64px;height:64px;"
+                     viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="32" r="28" stroke="#f3e8ff" stroke-width="6"/>
+                    <path d="M32 4 A28 28 0 0 1 60 32" stroke="#7c3aed" stroke-width="6"
+                          stroke-linecap="round"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;
+                            justify-content:center;font-size:1rem;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#7c3aed">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                </div>
+            </div>
+            <p style="font-size:1rem;font-weight:800;color:#1e1b4b;margin:0 0 6px 0;">
+                Importando contactos
+            </p>
+            <p style="font-size:.83rem;color:#6b7280;margin:0 0 18px 0;">
+                Procesando <strong style="color:#7c3aed;">${total.toLocaleString('es')}</strong> registros...
+            </p>
+            <div style="height:4px;background:#f3e8ff;border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:30%;background:linear-gradient(90deg,#7c3aed,#a78bfa);
+                            border-radius:2px;animation:progress-slide 1.6s ease-in-out infinite;">
+                </div>
+            </div>
+            <p style="font-size:.74rem;color:#9ca3af;margin:12px 0 0 0;">
+                No cierres esta ventana
+            </p>
+        </div>
+        <style>
+            @keyframes spin-import { to { transform: rotate(360deg); } }
+            @keyframes progress-slide {
+                0%   { margin-left:-30%; }
+                100% { margin-left:100%; }
+            }
+        </style>`;
+
+    document.body.appendChild(overlay);
+
+    // Deshabilitar el botón del modal para evitar doble envío
+    const btn = document.getElementById('btnConfirmImport');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
+}
+
+function cerrarModal() {
+    document.getElementById('csvOverlay').classList.remove('open');
+}
+
+// Cerrar con Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+// Cerrar al clic en overlay (fuera del modal)
+document.getElementById('csvOverlay').addEventListener('click', function(e) {
+    if (e.target === this) cerrarModal();
+});
+
+// ═══ Plantilla ═══════════════════════════════════════════════════════════
+function descargarPlantilla() {
+    const csv  = "telefono,nombre,etiquetas,notas\n593998765432,Juan Perez,cliente,\n593987654321,Maria Lopez,lead,Cliente potencial\n593976543210,Carlos Rios,cliente lead,VIP\n";
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href  = URL.createObjectURL(blob);
+    link.download = 'plantilla_contactos.csv';
+    link.click();
+}
+
+// ═══ Paginación de tabla de resultados ═══════════════════════════════════
+(function() {
+    var dataEl = document.getElementById('resultDataJson');
+    if (!dataEl) return;  // Solo existe en la página de resultados
+
+    var ROWS = JSON.parse(dataEl.textContent);
+    var currentPage = 1;
+
+    function getPageSize() {
+        var sel = document.getElementById('pageSizeSelect');
+        return sel ? parseInt(sel.value) : 25;
+    }
+
+    function renderTabla() {
+        var ps    = getPageSize();
+        var total = ROWS.length;
+        var pages = Math.max(1, Math.ceil(total / ps));
+        if (currentPage > pages) currentPage = pages;
+
+        var start = (currentPage - 1) * ps;
+        var end   = Math.min(start + ps, total);
+        var slice = ROWS.slice(start, end);
+
+        // Actualizar info
+        document.getElementById('pageInfo').textContent =
+            'Mostrando ' + (start + 1).toLocaleString('es') + ' – ' +
+            end.toLocaleString('es') + ' de ' + total.toLocaleString('es') + ' filas';
+
+        // Renderizar filas
+        var tbody = document.getElementById('resultTableBody');
+        tbody.innerHTML = '';
+        slice.forEach(function(fila) {
+            var tr = document.createElement('tr');
+            var badgeHTML;
+            if (fila.estado === 'creado') {
+                badgeHTML = '<span class="badge-ok">Nuevo</span>';
+            } else if (fila.estado === 'actualizado') {
+                badgeHTML = '<span class="badge-dup">Actualizado</span>';
+            } else {
+                badgeHTML = '<span class="badge-err">Error</span>';
+            }
+            tr.innerHTML =
+                '<td>' + fila.fila + '</td>' +
+                '<td>' + (fila.telefono || '—') + '</td>' +
+                '<td>' + (fila.nombre   || '—') + '</td>' +
+                '<td>' + badgeHTML + '</td>' +
+                '<td style="color:#888;font-size:0.78rem;">' + (fila.mensaje || '') + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        // Renderizar paginación
+        renderPaginacion(pages);
+    }
+
+    function renderPaginacion(totalPages) {
+        var bar = document.getElementById('paginationBar');
+        bar.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        var btnStyle = 'min-width:34px;height:34px;padding:0 10px;border-radius:7px;' +
+                       'border:1.5px solid #e5e7eb;background:#fff;font-size:0.82rem;' +
+                       'font-weight:600;cursor:pointer;transition:all .15s;';
+        var activeStyle = 'background:#7c3aed;color:#fff;border-color:#7c3aed;';
+
+        // Anterior
+        var prev = document.createElement('button');
+        prev.type = 'button';
+        prev.textContent = '← Anterior';
+        prev.style.cssText = btnStyle + (currentPage === 1 ? 'opacity:.4;cursor:default;' : '');
+        prev.disabled = currentPage === 1;
+        prev.onclick = function() { cambiarPagina(currentPage - 1); };
+        bar.appendChild(prev);
+
+        // Números de página (mostrar máx 7)
+        var pages = calcularPaginas(currentPage, totalPages);
+        pages.forEach(function(p) {
+            if (p === '…') {
+                var dots = document.createElement('span');
+                dots.textContent = '…';
+                dots.style.cssText = 'padding:0 4px;color:#9ca3af;font-size:0.82rem;align-self:center;';
+                bar.appendChild(dots);
+            } else {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = p;
+                btn.style.cssText = btnStyle + (p === currentPage ? activeStyle : '');
+                btn.onclick = (function(pg) {
+                    return function() { cambiarPagina(pg); };
+                })(p);
+                bar.appendChild(btn);
+            }
+        });
+
+        // Siguiente
+        var next = document.createElement('button');
+        next.type = 'button';
+        next.textContent = 'Siguiente →';
+        next.style.cssText = btnStyle + (currentPage === totalPages ? 'opacity:.4;cursor:default;' : '');
+        next.disabled = currentPage === totalPages;
+        next.onclick = function() { cambiarPagina(currentPage + 1); };
+        bar.appendChild(next);
+    }
+
+    function calcularPaginas(current, total) {
+        if (total <= 7) {
+            var arr = [];
+            for (var i = 1; i <= total; i++) arr.push(i);
+            return arr;
+        }
+        var pages = [1];
+        if (current > 3) pages.push('…');
+        for (var p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+            pages.push(p);
+        }
+        if (current < total - 2) pages.push('…');
+        pages.push(total);
+        return pages;
+    }
+
+    // Función global para el select y botones
+    window.cambiarPagina = function(pg) {
+        var ps    = getPageSize();
+        var pages = Math.max(1, Math.ceil(ROWS.length / ps));
+        currentPage = Math.max(1, Math.min(pg, pages));
+        renderTabla();
+        // Scroll suave a la tabla
+        var table = document.getElementById('resultTable');
+        if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // Inicializar
+    renderTabla();
+})();
+
+// ═══ Drag & drop ═════════════════════════════════════════════════════════
+const dropZone = document.getElementById('dropZone');
+if (dropZone) {
+    ['dragover','dragenter'].forEach(ev => dropZone.addEventListener(ev, e => {
+        e.preventDefault(); dropZone.classList.add('active');
+    }));
+    ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+        e.preventDefault(); dropZone.classList.remove('active');
+    }));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            document.getElementById('csvFile').files = dt.files;
+            alSeleccionarArchivo(document.getElementById('csvFile'));
+        }
+    });
+}
+</script>
+{% endblock %}

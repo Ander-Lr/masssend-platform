@@ -1,0 +1,476 @@
+
+.bg-primary-soft {
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+
+/* ─────────────────────────────────────────────
+   TICKS DE ESTADO DE MENSAJES (estilo WhatsApp)
+───────────────────────────────────────────── */
+.status-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+/* ✓ simple gris — enviado al servidor */
+.status-sent {
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* ✓✓ gris — entregado al dispositivo */
+.status-delivered svg {
+    width: 16px;
+    height: 16px;
+    fill: rgba(255,255,255,0.7);
+}
+
+/* ✓✓ azul — leído */
+.status-read svg {
+    width: 16px;
+    height: 16px;
+    fill: #53bdeb;
+}
+
+/* ⚠ rojo — fallido */
+.status-failed svg {
+    width: 16px;
+    height: 16px;
+    fill: #ff6b6b;
+}
+
+/* En la LISTA de chats los ticks van sobre fondo blanco → colores más oscuros */
+.chat-item .status-sent {
+    color: #8696a0;
+}
+.chat-item .status-delivered svg {
+    fill: #8696a0;
+}
+.chat-item .status-read svg {
+    fill: #53bdeb;
+}
+.chat-item .status-failed svg {
+    fill: #dc3545;
+}
+
+/* Conversación activa */
+.active-conv {
+    background-color: rgba(var(--bs-primary-rgb), 0.25) !important;
+    border-left: 4px solid var(--bs-primary);
+}
+
+/* Avatar */
+.list-group-item img {
+    width: 40px;
+    height: 40px;
+}
+
+/* Eliminar bordes extra de Bootstrap */
+.list-group-item {
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.btn-no-leidos {
+    background-color: rgba(var(--bs-primary-rgb), 0.3) !important;
+    font-size: 0.7rem;
+    font-weight: 300;
+    padding: 0.35rem 0.8rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+/*chats */
+.chat-item {
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.chat-item:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.3)
+}
+
+.active-chat {
+    background-color: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+.hora {
+    transition: color 0.2s ease-in-out;
+}
+
+.hora:hover {
+    color: var(--bs-primary);
+}
+
+/* Hover Anotaciones */
+.btn-anotaciones {
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-anotaciones:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.3);
+    transform: scale(1.02);
+}
+
+.btn-anotaciones svg {
+    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.btn-anotaciones:hover svg {
+    color: rgba(var(--bs-primary-rgb), 1);
+    transform: rotate(-5deg);
+}
+
+
+.right_col {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==================== MODO OSCURO ==================== */
+
+/* Contenedor principal */
+[data-bs-theme="dark"] .right_col {
+    background-color: #121212;
+}
+
+/* Título */
+[data-bs-theme="dark"] h4.text-primary {
+    color: #64b5f6 !important;
+}
+
+/* Área de conversaciones (sidebar izquierdo) */
+[data-bs-theme="dark"] .bg-primary-soft {
+    background-color: rgba(100, 181, 246, 0.15) !important;
+}
+
+/* Input de búsqueda */
+[data-bs-theme="dark"] .form-control {
+    background-color: #2d2d2d;
+    border-color: #444;
+    color: #ccc;
+}
+
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: #888;
+}
+
+[data-bs-theme="dark"] .form-control:focus {
+    background-color: #333;
+    border-color: #64b5f6;
+    color: #fff;
+}
+
+/* Botón "No leídos" */
+[data-bs-theme="dark"] .btn-no-leidos {
+    background-color: rgba(100, 181, 246, 0.25) !important;
+    color: #64b5f6 !important;
+}
+
+/* Items de chat (conversaciones) */
+[data-bs-theme="dark"] .chat-item {
+    background-color: transparent;
+    color: #ccc;
+}
+
+[data-bs-theme="dark"] .chat-item:hover {
+    background-color: rgba(100, 181, 246, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .active-chat {
+    background-color: rgba(100, 181, 246, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .chat-item h7 {
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .chat-item small {
+    color: #999;
+}
+
+/* Badge de mensajes no leídos */
+[data-bs-theme="dark"] .badge.bg-primary {
+    background-color: #64b5f6 !important;
+    color: #000 !important;
+}
+
+/* Área del chat principal */
+[data-bs-theme="dark"] #colChat .bg-white {
+    background-color: #1e1e1e !important;
+}
+
+/* Encabezado del chat */
+[data-bs-theme="dark"] .border-bottom {
+    border-color: #444 !important;
+}
+
+[data-bs-theme="dark"] #colChat h6 {
+    color: #fff;
+}
+
+[data-bs-theme="dark"] #colChat small.text-muted {
+    color: #999 !important;
+}
+
+/* Botones del encabezado */
+[data-bs-theme="dark"] .btn-link {
+    color: #ccc;
+}
+
+[data-bs-theme="dark"] .btn-link:hover {
+    color: #64b5f6;
+}
+
+/* Mensajes del chat */
+[data-bs-theme="dark"] .chat-messages {
+    background-color: #1e1e1e;
+}
+
+/* Mensaje recibido */
+[data-bs-theme="dark"] .chat-messages .bg-primary-soft {
+    background-color: rgba(100, 181, 246, 0.2) !important;
+    color: #fff;
+}
+
+/* Mensaje enviado */
+[data-bs-theme="dark"] .chat-messages .bg-light {
+    background-color: #2d2d2d !important;
+    color: #ccc;
+}
+
+/* Hora de mensajes */
+[data-bs-theme="dark"] .chat-messages small {
+    color: #888;
+}
+
+[data-bs-theme="dark"] .text-primary.fw-bold {
+    color: #64b5f6 !important;
+}
+
+/* Caja de escritura */
+[data-bs-theme="dark"] .d-flex.align-items-center.bg-primary-soft {
+    background-color: rgba(100, 181, 246, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .form-control.bg-transparent {
+    background-color: transparent !important;
+    color: #fff;
+}
+
+/* Botones de la caja de escritura */
+[data-bs-theme="dark"] .btn-link.text-primary {
+    color: #64b5f6 !important;
+}
+
+/* Panel de información (derecho) */
+[data-bs-theme="dark"] #colInfo {
+    background-color: rgba(100, 181, 246, 0.1) !important;
+}
+
+[data-bs-theme="dark"] #colInfo h6 {
+    color: #fff;
+}
+
+[data-bs-theme="dark"] #colInfo small.text-muted {
+    color: #999 !important;
+}
+
+/* Botones de acciones (Imagen, PDF, Link) */
+[data-bs-theme="dark"] #colInfo .btn {
+    background-color: rgba(100, 181, 246, 0.25) !important;
+}
+
+[data-bs-theme="dark"] #colInfo .btn:hover {
+    background-color: rgba(100, 181, 246, 0.35) !important;
+}
+
+/* Botón Anotaciones */
+[data-bs-theme="dark"] .btn-anotaciones {
+    background-color: rgba(100, 181, 246, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .btn-anotaciones:hover {
+    background-color: rgba(100, 181, 246, 0.35) !important;
+}
+
+[data-bs-theme="dark"] .btn-anotaciones span {
+    color: #ccc;
+}
+
+/* Botón eliminar chat */
+[data-bs-theme="dark"] .border-top {
+    border-color: #444 !important;
+}
+
+[data-bs-theme="dark"] .text-danger {
+    color: #ff6b6b !important;
+}
+
+/* SVG Icons */
+[data-bs-theme="dark"] svg {
+    color: #ccc;
+}
+
+[data-bs-theme="dark"] svg path,
+[data-bs-theme="dark"] svg circle {
+    stroke: #ccc;
+}
+
+/* Cards y contenedores */
+[data-bs-theme="dark"] .card-body {
+    background-color: #1e1e1e;
+}
+
+/* Scrollbar del chat */
+[data-bs-theme="dark"] .chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+[data-bs-theme="dark"] .chat-messages::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+[data-bs-theme="dark"] .chat-messages::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+[data-bs-theme="dark"] .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+/* Tablets y pantallas medianas */
+@media (max-width: 992px) {
+    /* Reducir tamaño de columnas */
+    #colConversaciones {
+        min-width: 300px;
+    }
+    
+    /* Panel de información ocupa más espacio */
+    #colInfo.col-3 {
+        min-width: 280px;
+    }
+}
+
+/* Móviles */
+@media (max-width: 768px) {
+    /* Ocultar columnas por defecto en móvil */
+    .chat-container {
+        position: relative;
+    }
+    
+    /* Lista de conversaciones ocupa toda la pantalla */
+    #colConversaciones {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+    
+    /* Chat ocupa toda la pantalla cuando está activo */
+    #colChat {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
+    }
+    
+    /* Panel de información ocupa toda la pantalla */
+    #colInfo {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 20;
+    }
+    
+    /* Welcome screen ocupa toda la pantalla */
+    #welcomeScreen {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+    
+    /* Plantillas ocupa toda la pantalla */
+    #colPlantillas {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+    
+    /* Perfil ocupa toda la pantalla */
+    #colPerfil {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+    
+    /* Ajustar altura de mensajes en móvil */
+    .chat-messages {
+        height: calc(100vh - 250px) !important;
+    }
+    
+    /* Botón de volver más visible */
+    .btn-link.d-md-none {
+        padding: 8px !important;
+        margin-right: 8px !important;
+    }
+    
+    /* Reducir padding en móvil */
+    .chat-container {
+        padding: 0 !important;
+    }
+    
+    /* Ajustar tamaño de fuentes en móvil */
+    .chat-item h7 {
+        font-size: 0.95rem;
+    }
+    
+    .chat-item small {
+        font-size: 0.75rem;
+    }
+}
+
+/* Móviles pequeños */
+@media (max-width: 576px) {
+    /* Reducir aún más el padding */
+    #colConversaciones .p-3,
+    #colChat .p-3,
+    #colInfo .p-3 {
+        padding: 0.75rem !important;
+    }
+    
+    /* Ajustar tamaño de avatares */
+    .chat-item svg,
+    #colChat svg {
+        width: 28px !important;
+        height: 28px !important;
+    }
+    
+    /* Mensajes más compactos */
+    .chat-messages .rounded {
+        max-width: 85% !important;
+    }
+    
+    /* Botones más pequeños */
+    .btn-link svg {
+        width: 18px !important;
+        height: 18px !important;
+    }
+}

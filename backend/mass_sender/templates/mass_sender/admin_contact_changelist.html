@@ -1,0 +1,291 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block search %}
+{{ block.super }}
+<style>
+    /* ── Barra de herramientas de contactos ───────────────────────── */
+    .contact-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 14px 0 6px 0;
+        padding: 12px 16px;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #ede9fe;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+
+    /* ── Chips de filtro ──────────────────────────────────────────── */
+    .contact-chips {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .filter-bar-label {
+        font-size: 0.70rem;
+        font-weight: 700;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-right: 2px;
+        white-space: nowrap;
+    }
+    .filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none !important;
+        border: 1.5px solid #e5e7eb;
+        background: #f9fafb;
+        color: #374151;
+        transition: all .15s;
+        white-space: nowrap;
+    }
+    .filter-chip:hover {
+        background: #f3e8ff;
+        color: #7c3aed;
+        border-color: #ddd6fe;
+    }
+    .filter-chip.active {
+        background: #7c3aed;
+        color: #fff !important;
+        border-color: #7c3aed;
+    }
+    /* verde — solo activos */
+    .filter-chip.chip-green {
+        background: #ecfdf5;
+        color: #065f46;
+        border-color: #a7f3d0;
+    }
+    .filter-chip.chip-green:hover { background: #d1fae5; }
+    .filter-chip.chip-green.active {
+        background: #10b981;
+        color: #fff !important;
+        border-color: #10b981;
+    }
+    /* rojo — opt-out */
+    .filter-chip.chip-red {
+        background: #fff1f2;
+        color: #9f1239;
+        border-color: #fca5a5;
+    }
+    .filter-chip.chip-red:hover { background: #fee2e2; }
+    .filter-chip.chip-red.active {
+        background: #ef4444;
+        color: #fff !important;
+        border-color: #ef4444;
+    }
+
+    .filter-divider {
+        width: 1px;
+        height: 18px;
+        background: #e5e7eb;
+        flex-shrink: 0;
+        margin: 0 2px;
+    }
+
+    /* ── Botón importar CSV ───────────────────────────────────────── */
+    .btn-importar-csv {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 16px;
+        background: #7c3aed;
+        color: #fff !important;
+        border-radius: 8px;
+        font-size: 0.81rem;
+        font-weight: 700;
+        text-decoration: none !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: background .15s;
+    }
+    .btn-importar-csv:hover {
+        background: #6d28d9;
+        color: #fff !important;
+    }
+    .btn-importar-csv svg { flex-shrink: 0; }
+</style>
+
+<div class="contact-toolbar">
+
+    <!-- Chips de filtro (izquierda) -->
+    <div class="contact-chips">
+        <span class="filter-bar-label">Filtrar</span>
+
+        <a href="?"
+           class="filter-chip {% if not request.GET.is_opted_out__exact and not active_tag %}active{% endif %}">
+            Todos
+        </a>
+
+        <a href="?is_opted_out__exact=0"
+           class="filter-chip chip-green {% if request.GET.is_opted_out__exact == '0' and not active_tag %}active{% endif %}">
+            <svg width="7" height="7" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+            Solo activos
+        </a>
+
+        <a href="?is_opted_out__exact=1"
+           class="filter-chip chip-red {% if request.GET.is_opted_out__exact == '1' %}active{% endif %}">
+            <svg width="7" height="7" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+            Opt-out
+        </a>
+
+        {% if available_tags %}
+        <div class="filter-divider"></div>
+        <span class="filter-bar-label">Etiquetas</span>
+        {% for tag in available_tags %}
+            {% with base_qs=request.GET.is_opted_out__exact %}
+            <a href="?_tag={{ tag }}{% if base_qs %}&is_opted_out__exact={{ base_qs }}{% endif %}"
+               class="filter-chip {% if active_tag == tag %}active{% endif %}">
+                {{ tag }}
+            </a>
+            {% endwith %}
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Botón Importar CSV (derecha) -->
+    <a href="{{ import_url }}" class="btn-importar-csv">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Importar CSV
+    </a>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var inputs = document.querySelectorAll('input[type="search"], input[name="q"]');
+    inputs.forEach(function (inp) {
+        inp.placeholder = 'Buscar por número, nombre o etiqueta...';
+    });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+<!-- ── Modal de confirmación de eliminación ─────────────────────────── -->
+<div id="wpp-delete-overlay"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+            z-index:9998;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:16px;padding:36px 32px;max-width:430px;
+                width:92%;box-shadow:0 24px 64px rgba(0,0,0,.28);text-align:center;">
+        <div style="font-size:2.8rem;margin-bottom:14px;">🗑️</div>
+        <h3 style="margin:0 0 10px;font-size:1.15rem;font-weight:700;color:#111827;">
+            ¿Eliminar contactos?
+        </h3>
+        <p id="wpp-delete-msg"
+           style="color:#6b7280;font-size:0.88rem;margin:0 0 24px;line-height:1.55;">
+        </p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button id="wpp-cancel-btn" type="button"
+                    style="padding:10px 26px;border:1.5px solid #e5e7eb;background:#fff;
+                           border-radius:8px;font-weight:600;cursor:pointer;
+                           color:#374151;font-size:0.9rem;transition:background .15s;">
+                Cancelar
+            </button>
+            <button id="wpp-confirm-btn" type="button"
+                    style="padding:10px 26px;background:#ef4444;border:none;
+                           border-radius:8px;font-weight:700;color:#fff;
+                           cursor:pointer;font-size:0.9rem;transition:background .15s;">
+                Sí, eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Spinner de procesamiento ────────────────────────────────────── -->
+<div id="wpp-spinner-overlay"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);
+            z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:18px;">
+    <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,.25);
+                border-top-color:#fff;border-radius:50%;
+                animation:wpp-spin .75s linear infinite;"></div>
+    <p style="color:#fff;font-weight:600;font-size:1rem;margin:0;letter-spacing:.01em;">
+        Eliminando contactos…
+    </p>
+</div>
+
+<style>
+@keyframes wpp-spin { to { transform: rotate(360deg); } }
+#wpp-cancel-btn:hover { background:#f9fafb !important; }
+#wpp-confirm-btn:hover { background:#dc2626 !important; }
+</style>
+
+<script>
+(function () {
+    var overlay  = document.getElementById('wpp-delete-overlay');
+    var spinner  = document.getElementById('wpp-spinner-overlay');
+    var confirmB = document.getElementById('wpp-confirm-btn');
+    var cancelB  = document.getElementById('wpp-cancel-btn');
+    var pendingForm = null;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Interceptar todos los formularios que tengan un select de acciones
+        document.querySelectorAll('form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var sel = form.querySelector('select[name="action"]');
+                if (!sel) return;
+                if (sel.value !== 'eliminar_contactos_seleccionados') return;
+
+                e.preventDefault();
+                pendingForm = form;
+
+                // Contar seleccionados
+                var checked = form.querySelectorAll('input[name="_selected_action"]:checked');
+                var count   = checked.length;
+
+                var msg = document.getElementById('wpp-delete-msg');
+                if (count === 0) {
+                    msg.textContent = 'Se eliminarán permanentemente los contactos seleccionados. Esta acción no se puede deshacer.';
+                } else {
+                    msg.textContent = 'Se eliminarán permanentemente ' + count +
+                        ' contacto' + (count === 1 ? '' : 's') +
+                        '. Esta acción no se puede deshacer.';
+                }
+                overlay.style.display = 'flex';
+            });
+        });
+
+        // Confirmar → mostrar spinner y enviar
+        confirmB.addEventListener('click', function () {
+            if (!pendingForm) return;
+            overlay.style.display = 'none';
+            spinner.style.display = 'flex';
+            pendingForm.submit();
+        });
+
+        // Cancelar
+        cancelB.addEventListener('click', function () {
+            overlay.style.display = 'none';
+            pendingForm = null;
+        });
+
+        // Cerrar al hacer clic fuera del modal
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) {
+                overlay.style.display = 'none';
+                pendingForm = null;
+            }
+        });
+    });
+})();
+</script>
+
+{% endblock %}

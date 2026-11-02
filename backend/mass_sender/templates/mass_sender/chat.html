@@ -1,0 +1,2243 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es_EC">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MassSend - Mensajería Masiva</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="../../../lib/jquery/plugins/select2/jquery-select2.min.css">
+    <link rel="stylesheet" href="../../../css/autocomplete/autocomplete_server.css" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="{% static 'mass_sender/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'mass_sender/subir-tutoriales.css' %}">
+    <link rel="stylesheet" href="{% static 'mass_sender/avion.css' %}">
+    <link rel="stylesheet" href="{% static 'mass_sender/botones.css' %}">
+
+    <style>
+
+        .menu-separator {
+            width: 40px;
+            border: none;
+            border-top: 1px solid #757575ff;
+            margin: 8px 0;
+        }
+
+        /* perfil */
+
+        #colPerfil > div {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        #colPerfil .perfil-info-section {
+            flex: 1; /* Esto empuja el botón hacia abajo */
+        }
+
+        .perfil-avatar img {
+            object-fit: cover;
+            border: 4px solid var(--bs-primary);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-edit-name,
+        .btn-edit-small {
+            background: none;
+            border: none;
+            padding: 6px;
+            cursor: pointer;
+            color: #6c757d;
+            transition: all 0.2s ease;
+            border-radius: 6px;
+        }
+
+        .btn-edit-name:hover,
+        .btn-edit-small:hover {
+            background: rgba(var(--bs-primary-rgb), 0.1);
+            color: var(--bs-primary);
+        }
+
+        .perfil-info-item {
+            padding: 12px 0;
+        }
+
+        .badge-soft-cute {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 22px;
+            background: linear-gradient(135deg, #f0fff4 0%, #e6f9ed 100%);
+            border: 1.8px solid #9ae6b4;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #276749;
+            box-shadow: 0 3px 12px rgba(154, 230, 180, 0.25),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .badge-soft-cute:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 18px rgba(154, 230, 180, 0.35);
+        }
+
+        .dot-glow {
+            width: 10px;
+            height: 10px;
+            background: #48bb78;
+            border-radius: 50%;
+            position: relative;
+            animation: glow-pulse 2s infinite ease-in-out;
+        }
+
+        .dot-glow::before,
+        .dot-glow::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .dot-glow::before {
+            width: 100%;
+            height: 100%;
+            background: #48bb78;
+            animation: ripple 2s infinite;
+        }
+
+        .dot-glow::after {
+            width: 6px;
+            height: 6px;
+            top: 2px;
+            left: 2px;
+            background: #9ae6b4;
+            opacity: 0.8;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% {
+                box-shadow: 0 0 8px rgba(72, 187, 120, 0.6),
+                            0 0 0 2px rgba(72, 187, 120, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 15px rgba(72, 187, 120, 0.8),
+                            0 0 0 4px rgba(72, 187, 120, 0.3);
+            }
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+            100% {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+
+        .status-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+        }
+
+        .status-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor; 
+        }
+
+
+        .status-sent {
+            color: #8696a0;
+        }
+
+        .status-delivered {
+            color: #8696a0; 
+        }
+
+        .status-read {
+            color: #34b7f1;
+        }
+
+        .status-failed {
+            color: #ea4335; 
+        }
+
+        /* ============================================
+        MENÚ HORIZONTAL MÓVIL
+        ============================================ */
+        .menu-horizontal-btn {
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 12px;
+            background-color: transparent;
+            color: var(--bs-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .menu-horizontal-btn:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.08);
+            color: var(--bs-primary);
+        }
+
+        .menu-horizontal-btn:active {
+            background-color: rgba(var(--bs-primary-rgb), 0.12);
+        }
+
+        /* Cuando el menú está activo/seleccionado */
+        .menu-horizontal-btn.active {
+            background-color: rgba(var(--bs-primary-rgb), 0.12);
+            color: var(--bs-primary);
+        }
+
+        /* Línea inferior animada (horizontal) */
+        .menu-horizontal-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 3px;
+            background-color: var(--bs-primary);
+            border-radius: 10px;
+            animation: expandLine 0.4s ease-out;
+        }
+
+        @keyframes expandLine {
+            0% {
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+            }
+            50% {
+                width: 4px;
+                height: 4px;
+                border-radius: 50%;
+            }
+            100% {
+                width: 24px;
+                height: 3px;
+                border-radius: 10px;
+            }
+        }
+
+        .menu-horizontal-btn svg {
+            width: 24px;
+            height: 24px;
+            transition: none;
+        }
+
+        /* Ocultar el texto en móvil (por si acaso) */
+        .menu-horizontal-btn span {
+            display: none;
+        }
+
+        .menu-horizontal-separator {
+            width: 1px;
+            height: 30px;
+            background-color: rgba(var(--bs-primary-rgb), 0.2);
+            margin: 0 8px;
+        }
+
+        /* Forzar que en desktop siempre se vean las conversaciones si estamos en la sección mensajes */
+        @media (min-width: 768px) {
+            .d-md-show-flex {
+                display: flex !important;
+            }
+        }
+
+        /* ===== BÚSQUEDA EN CHAT ===== */
+        .search-highlight {
+            background-color: var(--bs-primary)
+            border-radius: 3px;
+            padding: 0 1px;
+        }
+
+        .search-highlight.active {
+            background-color: var(--bs-secondary);
+            color: #fff;
+        }
+
+        /* Burbuja con coincidencia */
+        .msg-has-match {
+            box-shadow: 0 0 0 2px var(--bs-primary); !important;
+        }
+
+        #chatSearchBar {
+            animation: searchSlideDown 0.2s ease-out;
+        }
+
+        @keyframes searchSlideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== PANEL MULTIMEDIA ===== */
+
+        /* Grupo por fecha */
+        .media-group-title {
+            color: #667781;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 14px 0 8px;
+            letter-spacing: 0.3px;
+        }
+
+        /* Grid multimedia */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+            gap: 4px;
+        }
+
+        .media-grid-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            background: #f0f2f5;
+        }
+
+        .media-grid-item img,
+        .media-grid-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s;
+        }
+
+        .media-grid-item:hover img,
+        .media-grid-item:hover video {
+            transform: scale(1.05);
+        }
+
+        .media-video-badge {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Documentos */
+        .doc-list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .doc-list-item:hover {
+            background: #e9ecef;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .doc-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .doc-name {
+            color: #2C3E50;
+            font-size: 0.88rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .doc-meta {
+            color: #8696A0;
+            font-size: 0.73rem;
+            margin-top: 3px;
+        }
+
+        /* Enlaces */
+        .link-list-item {
+            display: flex;
+            gap: 12px;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .link-list-item:hover {
+            background: #e9ecef;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .link-preview-img {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            background: #e9ecef;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .link-url {
+            color: rgba(var(--bs-primary-rgb), 1);
+            font-size: 0.76rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .link-text {
+            color: #667781;
+            font-size: 0.8rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Estado vacío */
+        .media-empty {
+            text-align: center;
+            padding: 50px 20px;
+            color: #8696A0;
+        }
+
+        .media-empty svg {
+            margin-bottom: 14px;
+            opacity: 0.35;
+        }
+
+        .media-empty p {
+            font-size: 0.88rem;
+            margin: 0;
+        }
+
+    </style>
+
+    <style>
+        emoji-picker {
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        /* Animación de entrada */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        emoji-picker[style*="display: block"] {
+            animation: fadeInUp 0.2s ease-out;
+        }
+
+        .chat-item-wrapper {
+            position: relative;
+        }
+
+        .chat-menu-btn {
+            position: absolute;
+            top: 57%;
+            right: 3px;
+            transform: translateY(-50%);
+            padding: 4px 6px;
+            cursor: pointer;
+            color: #aaa;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 1;
+        }
+
+        .chat-item-wrapper:hover .chat-menu-btn {
+            opacity: 1;
+        }
+
+        .chat-dropdown {
+            position: absolute;
+            right: 8px;
+            top: calc(100% - 10px);
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            z-index: 100;
+            min-width: 160px;
+            overflow: hidden;
+        }
+
+        .chat-dropdown-item {
+            padding: 9px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .chat-dropdown-item:hover {
+            background: #f5f5f5;
+        }
+
+        .chat-dropdown-item-danger {
+            color: #dc3545 !important;
+            border-top: 1px solid var(--bs-border-color);
+        }
+
+        .chat-dropdown-item-danger:hover {
+            background: #fff5f5 !important;
+            color: #dc3545 !important;
+        }
+    </style>
+
+    <style>
+    @keyframes pulsarRojo {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.2; }
+    }
+
+    @keyframes waveBar {
+        0%, 100% { height: 6px; }
+        50%       { height: 22px; }
+    }
+    </style>
+</head>
+
+
+<body class="nav-md" style="background-color: #f3f4f6;">
+    <style>
+        :root {
+            --bs-primary: #4f46e5;
+            --bs-primary-rgb: 79, 70, 229;
+            --bs-body-bg: #ffffff;
+        }
+        .bg-dark { background-color: #111827 !important; }
+        .welcome-title-gradient { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .text-primary { color: #4f46e5 !important; }
+        .btn-primary { background-color: #4f46e5; border-color: #4f46e5; }
+        .btn-primary:hover { background-color: #4338ca; border-color: #4338ca; }
+        
+        /* Ocultar el viejo navbar negro para que se vea más limpio como aplicación pura */
+        .navbar { display: none !important; }
+    </style>
+    <!-- preloader -->
+    <div id="preloader">
+        <div class="preloader">
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
+    <!-- Navbar MassSend -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-paper-plane me-2"></i>MassSend</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-2 px-3" role="main">
+        <h4 class="text-primary mb-2 fw-bold">Panel de Mensajería Masiva</h4>
+
+        <div>
+            <div>
+                <div>
+                    <div>
+                        <div>
+                            <div id="NewPerfilForm">
+                                <div class="upload-tutorials-section">
+                                    <div>
+                                        <!-- Layout de conversaciones -->
+                                        <div class="row g-2 chat-container">
+
+                                                <!-- MENÚ HORIZONTAL MÓVIL (Solo visible en SM y XS) -->
+                                                <div class="d-xl-none mb-3">
+                                                    <div class="bg-primary-soft rounded p-2">
+                                                        <div class="d-flex justify-content-center align-items-center gap-2">
+                                                            <!-- Botón Mensajes -->
+                                                            <button class="menu-horizontal-btn active" id="btnMensajesMobile" onclick="cambiarVista('mensajes')" title="Mensajes">
+                                                                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path opacity="0.4" d="M17.98 10.79V14.79C17.98 15.05 17.97 15.3 17.94 15.54C17.71 18.24 16.12 19.58 13.19 19.58H12.79C12.54 19.58 12.3 19.7 12.15 19.9L10.95 21.5C10.42 22.21 9.56 22.21 9.03 21.5L7.82999 19.9C7.69999 19.73 7.41 19.58 7.19 19.58H6.79001C3.60001 19.58 2 18.79 2 14.79V10.79C2 7.86001 3.35001 6.27001 6.04001 6.04001C6.28001 6.01001 6.53001 6 6.79001 6H13.19C16.38 6 17.98 7.60001 17.98 10.79Z" fill="currentColor"></path>
+                                                                    <path d="M9.99023 14C9.43023 14 8.99023 13.55 8.99023 13C8.99023 12.45 9.44023 12 9.99023 12C10.5402 12 10.9902 12.45 10.9902 13C10.9902 13.55 10.5502 14 9.99023 14Z" fill="currentColor"></path>
+                                                                    <path d="M13.4902 14C12.9302 14 12.4902 13.55 12.4902 13C12.4902 12.45 12.9402 12 13.4902 12C14.0402 12 14.4902 12.45 14.4902 13C14.4902 13.55 14.0402 14 13.4902 14Z" fill="currentColor"></path>
+                                                                    <path d="M6.5 14C5.94 14 5.5 13.55 5.5 13C5.5 12.45 5.95 12 6.5 12C7.05 12 7.5 12.45 7.5 13C7.5 13.55 7.05 14 6.5 14Z" fill="currentColor"></path>
+                                                                    <path d="M21.9791 6.79001V10.79C21.9791 13.73 20.6291 15.31 17.9391 15.54C17.9691 15.3 17.9791 15.05 17.9791 14.79V10.79C17.9791 7.60001 16.3791 6 13.1891 6H6.78906C6.52906 6 6.27906 6.01001 6.03906 6.04001C6.26906 3.35001 7.85906 2 10.7891 2H17.1891C20.3791 2 21.9791 3.60001 21.9791 6.79001Z" fill="currentColor"></path>
+                                                                </svg>
+                                                            </button>
+
+                                                            <!-- Separador vertical -->
+                                                            <div class="menu-horizontal-separator"></div>
+
+                                                            <!-- Botón Perfil -->
+                                                            <button class="menu-horizontal-btn" id="btnPerfilMobile" onclick="cambiarVista('perfil')" title="Mi perfil">
+                                                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path opacity="0.5" d="M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" fill="currentColor"></path>
+                                                                    <path d="M16.807 19.0112C15.4398 19.9504 13.7841 20.5 12 20.5C10.2159 20.5 8.56023 19.9503 7.193 19.0111C6.58915 18.5963 6.33109 17.8062 6.68219 17.1632C7.41001 15.8302 8.90973 15 12 15C15.0903 15 16.59 15.8303 17.3178 17.1632C17.6689 17.8062 17.4108 18.5964 16.807 19.0112Z" fill="currentColor"></path>
+                                                                    <path d="M12 12C13.6569 12 15 10.6569 15 9C15 7.34315 13.6569 6 12 6C10.3432 6 9.00004 7.34315 9.00004 9C9.00004 10.6569 10.3432 12 12 12Z" fill="currentColor"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- MENÚ VERTICAL DESKTOP (Solo visible en MD+) -->
+                                                <div class="col-auto px-2 d-none d-xl-block">
+                                                    <div class="p-2 py-1 rounded h-100 bg-primary-soft d-flex flex-column align-items-center gap-1" style="width: 60px;">
+                                                        <!-- Botón de mensajes -->
+                                                        <button class="template-menu-btn mt-1 active" id="btnMensajes" onclick="cambiarVista('mensajes')" title="Mensajes">
+                                                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path opacity="0.4" d="M17.98 10.79V14.79C17.98 15.05 17.97 15.3 17.94 15.54C17.71 18.24 16.12 19.58 13.19 19.58H12.79C12.54 19.58 12.3 19.7 12.15 19.9L10.95 21.5C10.42 22.21 9.56 22.21 9.03 21.5L7.82999 19.9C7.69999 19.73 7.41 19.58 7.19 19.58H6.79001C3.60001 19.58 2 18.79 2 14.79V10.79C2 7.86001 3.35001 6.27001 6.04001 6.04001C6.28001 6.01001 6.53001 6 6.79001 6H13.19C16.38 6 17.98 7.60001 17.98 10.79Z" fill="currentColor"></path>
+                                                                <path d="M9.99023 14C9.43023 14 8.99023 13.55 8.99023 13C8.99023 12.45 9.44023 12 9.99023 12C10.5402 12 10.9902 12.45 10.9902 13C10.9902 13.55 10.5502 14 9.99023 14Z" fill="currentColor"></path>
+                                                                <path d="M13.4902 14C12.9302 14 12.4902 13.55 12.4902 13C12.4902 12.45 12.9402 12 13.4902 12C14.0402 12 14.4902 12.45 14.4902 13C14.4902 13.55 14.0402 14 13.4902 14Z" fill="currentColor"></path>
+                                                                <path d="M6.5 14C5.94 14 5.5 13.55 5.5 13C5.5 12.45 5.95 12 6.5 12C7.05 12 7.5 12.45 7.5 13C7.5 13.55 7.05 14 6.5 14Z" fill="currentColor"></path>
+                                                                <path d="M21.9791 6.79001V10.79C21.9791 13.73 20.6291 15.31 17.9391 15.54C17.9691 15.3 17.9791 15.05 17.9791 14.79V10.79C17.9791 7.60001 16.3791 6 13.1891 6H6.78906C6.52906 6 6.27906 6.01001 6.03906 6.04001C6.26906 3.35001 7.85906 2 10.7891 2H17.1891C20.3791 2 21.9791 3.60001 21.9791 6.79001Z" fill="currentColor"></path>
+                                                            </svg>
+                                                        </button>
+                                                    <!-- Botón de oportunidades 
+                                                        <button class="template-menu-btn" id="btnOportunidades" onclick="cambiarVista('oportunidades')" title="Oportunidades">
+                                                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path opacity="0.4" d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3Z" fill="currentColor"/>
+                                                                <path d="M7 8H17M7 12H13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                                                <path d="M15 15L17 17L21 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            </svg>
+                                                        </button>-->
+                                                        <!-- Separador -->
+                                                        <hr class="menu-separator my-2">
+
+                                                        <!-- Botón de perfil/usuario -->
+                                                        <button class="template-menu-btn" id="btnPerfil" onclick="cambiarVista('perfil')" title="Mi perfil">
+                                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                <path opacity="0.5" d="M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" fill="currentColor"></path>
+                                                                <path d="M16.807 19.0112C15.4398 19.9504 13.7841 20.5 12 20.5C10.2159 20.5 8.56023 19.9503 7.193 19.0111C6.58915 18.5963 6.33109 17.8062 6.68219 17.1632C7.41001 15.8302 8.90973 15 12 15C15.0903 15 16.59 15.8303 17.3178 17.1632C17.6689 17.8062 17.4108 18.5964 16.807 19.0112Z" fill="currentColor"></path>
+                                                                <path d="M12 12C13.6569 12 15 10.6569 15 9C15 7.34315 13.6569 6 12 6C10.3432 6 9.00004 7.34315 9.00004 9C9.00004 10.6569 10.3432 12 12 12Z" fill="currentColor"></path>
+                                                            </svg>
+                                                        </button>
+
+                                                        <!-- Separador -->
+                                                        <hr class="menu-separator my-2">
+
+                                                        <!-- Botón Cambiar Número -->
+                                                        <button class="template-menu-btn" id="btnCambiarNumero" onclick="cambiarVista('cambiar-numero')" title="Cambiar número de WhatsApp">
+                                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                                                                <path d="M6.62 10.79C8.06 13.62 10.38 15.93 13.21 17.38L15.41 15.18C15.68 14.91 16.08 14.82 16.43 14.94C17.55 15.31 18.76 15.51 20 15.51C20.55 15.51 21 15.96 21 16.51V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z" fill="currentColor" opacity="0.8"/>
+                                                                <path d="M20 8L17 5M17 5L14 8M17 5V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Columna de Perfil  -->
+                                                    <div class="col-12 col-xl-3" id="colPerfil" style="display: none;">
+                                                        <div class="p-4 rounded h-100 bg-white bg-primary-soft">
+                                                            <div class="perfil-header text-center mb-4">
+                                                                <div class="perfil-avatar mb-3">
+                                                                    <img src="https://ui-avatars.com/api/?name=Mass+Send&background=0D8ABC&color=fff" 
+                                                                        id="miFotoPerfil" 
+                                                                        alt="Avatar" 
+                                                                        class="rounded-circle" 
+                                                                        width="100" 
+                                                                        height="100"
+                                                                        style="object-fit: cover;">
+                                                                </div>
+                                                                <div class="perfil-name-container d-flex align-items-center justify-content-center gap-2">
+                                                                    <h5 class="mb-0 fw-bold" id="miNombrePerfil">Cargando...</h5>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="perfil-info-section mb-4">
+                                                                <div class="perfil-info-item border-bottom pb-3 mb-3">
+                                                                    <div class="d-flex justify-content-between align-items-center">
+                                                                        <div>
+                                                                            <small class="text-muted d-block mb-1">Info.</small>
+                                                                            <span class="info-text">Disponible</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="perfil-info-item">
+                                                                    <small class="text-muted d-block mb-1">Número de teléfono conectado</small>
+                                                                    <span class="info-text fw-semibold" id="miNumeroPerfil">Cargando...</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="text-center pt-4 border-top mt-auto">
+                                                                <button class="btn btn-outline-danger w-100" onclick="disconnectWhatsApp()">
+                                                                    Cerrar sesión
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                <!-- ══ PANEL: CAMBIAR NÚMERO ══ -->
+                                                <div class="col-12 col-xl-3" id="colCambiarNumero" style="display: none;">
+                                                    <div class="p-4 rounded h-100 bg-primary-soft">
+                                                        <h6 class="fw-bold mb-1">📱 Cambiar número de WhatsApp</h6>
+                                                        <small class="text-muted d-block mb-4">Úsalo si te banearon o quieres conectar otro número.</small>
+
+                                                        <!-- Número actual -->
+                                                        <div class="mb-4 p-3 rounded" style="background: rgba(var(--bs-primary-rgb),0.08); border: 1px solid rgba(var(--bs-primary-rgb),0.15);">
+                                                            <small class="text-muted d-block mb-1">Número conectado actualmente</small>
+                                                            <span class="fw-bold text-primary fs-6" id="numeroCambioActual">Cargando...</span>
+                                                        </div>
+
+                                                        <!-- Pasos -->
+                                                        <div class="mb-4">
+                                                            <p class="fw-semibold mb-2" style="font-size:0.85rem;">¿Cómo funciona?</p>
+                                                            <div class="d-flex align-items-start gap-2 mb-2">
+                                                                <span class="badge bg-primary rounded-circle" style="min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">1</span>
+                                                                <small class="text-muted">Haz clic en <strong>"Cerrar sesión"</strong> — esto desconecta el número actual.</small>
+                                                            </div>
+                                                            <div class="d-flex align-items-start gap-2 mb-2">
+                                                                <span class="badge bg-primary rounded-circle" style="min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">2</span>
+                                                                <small class="text-muted">Ve a tu terminal y <strong>reinicia Node.js</strong> (Ctrl+C → <code>node index.js</code>).</small>
+                                                            </div>
+                                                            <div class="d-flex align-items-start gap-2">
+                                                                <span class="badge bg-primary rounded-circle" style="min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;">3</span>
+                                                                <small class="text-muted">Escanea el nuevo <strong>código QR</strong> con el número que quieras conectar.</small>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Alerta -->
+                                                        <div class="alert alert-warning p-2 mb-4" style="font-size:0.8rem;">
+                                                            ⚠️ Al cerrar sesión, los chats e historial <strong>no se borran</strong> de la base de datos. Solo se desconecta el número de WhatsApp.
+                                                        </div>
+
+                                                        <!-- Botón de acción -->
+                                                        <button class="btn btn-danger w-100 mb-2 fw-bold" id="btnCerrarSesionWA" onclick="cerrarSesionWhatsApp()">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 24 24">
+                                                                <path d="M6.62 10.79C8.06 13.62 10.38 15.93 13.21 17.38L15.41 15.18C15.68 14.91 16.08 14.82 16.43 14.94C17.55 15.31 18.76 15.51 20 15.51C20.55 15.51 21 15.96 21 16.51V20C21 20.55 20.55 21 20 21C10.61 21 3 13.39 3 4C3 3.45 3.45 3 4 3H7.5C8.05 3 8.5 3.45 8.5 4C8.5 5.25 8.7 6.45 9.07 7.57C9.18 7.92 9.1 8.31 8.82 8.59L6.62 10.79Z"/>
+                                                            </svg>
+                                                            Cerrar sesión de WhatsApp
+                                                        </button>
+                                                        <div id="cambioNumeroMsg" class="text-center" style="font-size:0.8rem; display:none;"></div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Lista de conversaciones -->
+                                                <div class="col-12 col-xl-3" id="colConversaciones">
+                                                    <div class="p-3 rounded h-100 bg-primary-soft">
+                                                        <!-- Buscador -->
+                                                        <div class="mb-3 position-relative">
+                                                            <span class="position-absolute top-50 start-0 translate-middle-y ms-2 text-primary">
+                                                                <!-- SVG Lupa -->
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
+                                                                    <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18Z"
+                                                                        stroke="currentColor" stroke-width="2" />
+                                                                    <path d="M22 22L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                                                </svg>
+                                                            </span>
+                                                            <input type="text" class="form-control ps-5" placeholder="Buscar conversación" oninput="buscarConversacion(this.value)">
+                                                        </div>
+
+                                                        <!-- Botón No leídos -->
+                                                        <div class="mb-3">
+                                                            <button class="btn btn-no-leidos d-flex align-items-center bg-primary text-primary">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" class="me-2">
+                                                                    <circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2"></circle>
+                                                                    <path d="M21 12C21 12 20 4 12 4C4 4 3 12 3 12" stroke="currentColor" stroke-width="2"></path>
+                                                                </svg>
+                                                                No leídos
+                                                            </button>
+                                                        </div>
+
+                                                        
+
+                                                        <!-- Listado de chats -->
+                                                        <div class="list-group chat-list" style="overflow-y: auto; max-height: calc(100vh - 220px);">
+
+
+
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-12 col-xl" id="welcomeScreen" style="display: none;">
+                                                    <div class="welcome-screen-bg h-100 d-flex align-items-center justify-content-center rounded p-4 pt-2 pb-0">
+                                                        
+                                                        <!-- Aviones de papel animados -->
+                                                        <div class="paper-plane-container">
+                                                            <!-- Avión 1: De izquierda a derecha (diagonal ascendente) -->
+                                                            <div class="plane-wrapper plane-wrapper-1">
+                                                                <svg class="plane-trail" width="150" height="80" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M 0,40 Q 40,30 80,40 Q 120,50 150,40" 
+                                                                        fill="none" 
+                                                                        stroke="currentColor" 
+                                                                        stroke-width="2.5" 
+                                                                        stroke-dasharray="10 8" 
+                                                                        opacity="0.4"
+                                                                        stroke-linecap="round"/>
+                                                                </svg>
+                                                                <svg class="paper-plane plane-1" width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M2.5 3L22 12L2.5 21L5 12L2.5 3Z" fill="currentColor" opacity="0.8"/>
+                                                                    <path d="M5 12L22 12" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                                                                </svg>
+                                                            </div>
+                                                            
+                                                            <!-- Avión 2: De derecha a izquierda (diagonal descendente) -->
+                                                            <div class="plane-wrapper plane-wrapper-2">
+                                                                <svg class="plane-trail" width="140" height="75" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M 0,38 Q 35,28 70,38 Q 105,48 140,38" 
+                                                                        fill="none" 
+                                                                        stroke="currentColor" 
+                                                                        stroke-width="2.5" 
+                                                                        stroke-dasharray="9 7" 
+                                                                        opacity="0.4"
+                                                                        stroke-linecap="round"/>
+                                                                </svg>
+                                                                <svg class="paper-plane plane-2" width="35" height="35" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M2.5 3L22 12L2.5 21L5 12L2.5 3Z" fill="currentColor" opacity="0.8"/>
+                                                                    <path d="M5 12L22 12" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                                                                </svg>
+                                                            </div>
+                                                            
+                                                            <!-- Avión 3: De abajo hacia arriba (curva elegante) -->
+                                                            <div class="plane-wrapper plane-wrapper-3">
+                                                                <svg class="plane-trail" width="145" height="78" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M 0,39 Q 38,32 76,42 Q 110,48 145,39" 
+                                                                        fill="none" 
+                                                                        stroke="currentColor" 
+                                                                        stroke-width="2.5" 
+                                                                        stroke-dasharray="10 7" 
+                                                                        opacity="0.4"
+                                                                        stroke-linecap="round"/>
+                                                                </svg>
+                                                                <svg class="paper-plane plane-3" width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M2.5 3L22 12L2.5 21L5 12L2.5 3Z" fill="currentColor" opacity="0.8"/>
+                                                                    <path d="M5 12L22 12" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="welcome-content-box text-center py-5 pb-0">
+
+                                                        
+                                                            <!-- Título con gradiente -->
+                                                            <h1 class="welcome-title-gradient mb-3">
+                                                                Bienvenido a MassSend
+                                                            </h1>
+
+                                                            <!-- Subtítulo mejorado -->
+                                                            <p class="welcome-subtitle mb-4">
+                                                                Administra todas tus conversaciones<br>
+                                                                <span class="text-primary fw-semibold">desde un solo lugar</span>.
+                                                                    
+                                                            </p>
+
+                                                            <!-- Badge informativo -->
+                                                            <div class="welcome-badge mb-4">
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path clip-rule="evenodd" d="m12 3.75c-4.55635 0-8.25 3.69365-8.25 8.25 0 4.5563 3.69365 8.25 8.25 8.25 4.5563 0 8.25-3.6937 8.25-8.25 0-4.55635-3.6937-8.25-8.25-8.25zm-9.75 8.25c0-5.38478 4.36522-9.75 9.75-9.75 5.3848 0 9.75 4.36522 9.75 9.75 0 5.3848-4.3652 9.75-9.75 9.75-5.38478 0-9.75-4.3652-9.75-9.75zm9.75-.75c.4142 0 .75.3358.75.75v3.5c0 .4142-.3358.75-.75.75s-.75-.3358-.75-.75v-3.5c0-.4142.3358-.75.75-.75zm0-3.25c-.5523 0-1 .44772-1 1s.4477 1 1 1h.01c.5523 0 1-.44772 1-1s-.4477-1-1-1z" fill="currentColor" fill-rule="evenodd"></path></g></svg>
+                                                                <span>Rápido, seguro y fácil de usar</span>
+                                                            </div>
+
+                                                            <div class="mb-4">
+                                                                <span class="badge-soft-cute">
+                                                                    <span class="dot-glow"></span>
+                                                                        Online
+                                                                </span>
+                                                            </div>
+                                                            
+
+                                                            <!-- Pingüino mirando al cielo (fuera del contenedor con overflow) -->
+                                                            <div class="penguin-container">
+                                                                <img src="https://ui-avatars.com/api/?name=MS&background=0D8ABC&color=fff&rounded=true" alt="Logo" class="penguin-image">
+                                                            </div>
+
+                                                        </div>
+                                                        
+                                                    </div>
+                                                    
+                                                    
+                                                    
+                                                </div>
+
+                                                <!-- Conversación (chat) -->
+                                                <div class="col-12 col-xl" id="colChat" style="display: none;">
+                                                    <div class="p-0 rounded h-100 bg-white" style="display:flex; flex-direction:column; overflow:hidden;">
+
+                                                        <!-- Encabezado del chat -->
+                                                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                                            <!-- Info usuario -->
+                                                            <div class="d-flex align-items-center py-3 px-3 pb-1">
+
+                                                                
+                                                                <span class="me-2">
+                                                                    <!-- Icono usuario -->
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24">
+                                                                        <circle cx="12" cy="7" r="4" stroke="#2D2A4A" stroke-width="2" />
+                                                                        <path d="M4 21c0-4 4-7 8-7s8 3 8 7" stroke="#2D2A4A" stroke-width="2" />
+                                                                    </svg>
+                                                                </span>
+                                                                <div>
+                                                                    <h6 class="mb-0 fw-bold">+ 593 99 270 1234</h6>
+                                                                    <small class="text-muted">Usuario</small>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Acciones (lupa + menú 3 puntos) -->
+                                                            <div class="d-flex align-items-center gap-3 px-3">
+                                                                <!-- Lupa -->
+                                                                <button class="btn btn-link text-muted p-0"  onclick="toggleChatSearch()">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+                                                                        <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.5817 14.4183 2 10 2C5.5817 2 2 5.5817 2 10C2 14.4183 5.5817 18 10 18Z" stroke="currentColor" stroke-width="2" />
+                                                                        <path d="M22 22L16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                                                    </svg>
+                                                                </button>
+
+                                                                <!-- Botón tres puntos -->
+                                                                <button class="btn btn-link text-muted p-0" onclick="toggleInfo()">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                                                        <circle cx="12" cy="5" r="2" />
+                                                                        <circle cx="12" cy="12" r="2" />
+                                                                        <circle cx="12" cy="19" r="2" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <!--  BARRA DE BÚSQUEDA -->
+                                                        <div id="chatSearchBar" style="display:none; background:#f0f2f5; padding:8px 12px; border-bottom:1px solid #e0e0e0; align-items:center; gap:8px; border-radius: 0;">
+                                                            <div style="flex:1; display:flex; align-items:center; background:#fff; border-radius:20px; padding:4px 12px;">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" style="margin-right:8px; flex-shrink:0;">
+                                                                    <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.5817 14.4183 2 10 2C5.5817 2 2 5.5817 2 10C2 14.4183 5.5817 18 10 18Z" stroke="#999" stroke-width="2"/>
+                                                                    <path d="M22 22L16 16" stroke="#999" stroke-width="2" stroke-linecap="round"/>
+                                                                </svg>
+                                                                <input type="text" id="inputSearchChat" placeholder="Buscar en este chat..."
+                                                                    oninput="searchInChat(this.value)"
+                                                                    onkeydown="if(event.key==='Enter'){event.preventDefault(); navigateSearch('next');} if(event.key==='Escape'){closeChatSearch();}"
+                                                                    style="border:none; outline:none; width:100%; font-size:14px; background:transparent;">
+                                                            </div>
+                                                            <span id="searchResultsCount" style="font-size:12px; color:#667781; min-width:60px; text-align:center;"></span>
+                                                            <button class="btn btn-link p-0" onclick="navigateSearch('prev')" title="Anterior">
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 15L12 9L6 15" stroke="#667781" stroke-width="2" stroke-linecap="round"/></svg>
+                                                            </button>
+                                                            <button class="btn btn-link p-0" onclick="navigateSearch('next')" title="Siguiente">
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 9L12 15L18 9" stroke="#667781" stroke-width="2" stroke-linecap="round"/></svg>
+                                                            </button>
+                                                            <button class="btn btn-link p-0" onclick="closeChatSearch()" title="Cerrar">
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6L18 18" stroke="#667781" stroke-width="2" stroke-linecap="round"/></svg>
+                                                            </button>
+                                                        </div>
+
+                                                        <!-- Mensajes -->
+                                                        <div class="chat-messages p-3" style="flex:1; overflow-y:auto; min-height:0;">
+
+
+                                                        </div>
+
+                                                        <!-- Caja de escritura -->
+                                                        <div class="d-flex align-items-center p-2 bg-primary-soft rounded mx-2 mb-2" style="flex-shrink:0;">
+
+                                                            <!-- Input de mensaje -->
+                                                            <input type="text" class="form-control border-0 bg-transparent" placeholder="Escribe un mensaje">
+
+                                                                <!-- Botón de grabar audio -->
+                                                                <button 
+                                                                    class="btn btn-link text-primary p-2" 
+                                                                    id="btnGrabarAudio"
+                                                                    title="Mantén presionado para grabar audio">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                                                        <path d="M12 14C13.66 14 15 12.66 15 11V5C15 3.34 13.66 2 12 2C10.34 2 9 3.34 9 5V11C9 12.66 10.34 14 12 14Z"></path>
+                                                                        <path d="M19 11C19 14.31 16.31 17 13 17H11C7.69 17 5 14.31 5 11H7C7 13.21 8.79 15 11 15H13C15.21 15 17 13.21 17 11H19Z"></path>
+                                                                        <path d="M12 17V22M8 22H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                                                                    </svg>
+                                                                </button>
+
+                                                                <!-- Barra de grabación (reemplaza caja de escritura mientras graba) -->
+                                                                <div id="barraGrabacion" style="display:none; align-items:center; gap:10px;
+                                                                    padding: 8px 12px; width:100%;">
+
+                                                                    <!-- Eliminar -->
+                                                                    <button onclick="cancelarGrabacion()"
+                                                                            style="background:none; border:none; cursor:pointer; color:#667781; padding:4px; flex-shrink:0;">
+                                                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                                                            <path d="M2.75 6.17C2.75 5.7 3.1 5.33 3.52 5.33H6.19L7.36 3.95C7.68 3.56 8.18 3.33 8.7 3.33H15.3C15.82 3.33 16.32 3.56 16.64 3.95L17.81 5.33H20.48C20.9 5.33 21.25 5.7 21.25 6.17C21.25 6.63 20.9 7 20.48 7H3.52C3.1 7 2.75 6.63 2.75 6.17Z"/>
+                                                                            <path opacity=".5" d="M11.61 22H12.39C15.1 22 16.45 22 17.34 21.14C18.22 20.27 18.31 18.86 18.49 16.03L18.75 11.95C18.84 10.41 18.89 9.64 18.45 9.15C18.01 8.67 17.26 8.67 15.77 8.67H8.23C6.74 8.67 5.99 8.67 5.55 9.15C5.11 9.64 5.16 10.41 5.26 11.95L5.52 16.03C5.7 18.86 5.79 20.27 6.67 21.14C7.55 22 8.9 22 11.61 22Z"/>
+                                                                        </svg>
+                                                                    </button>
+
+                                                                    <!-- Punto rojo + timer -->
+                                                                    <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                                                        <div id="grabPunto" style="width:10px; height:10px; border-radius:50%;
+                                                                            background:#ef4444; animation: pulsarRojo 1s infinite;"></div>
+                                                                        <span id="grabTimer" style="font-size:0.88rem; font-weight:600;
+                                                                            color: var(--bs-body-color); min-width:38px;">0:00</span>
+                                                                    </div>
+
+                                                                    <!-- Waveform animado -->
+                                                                    <div id="grabWave" style="flex:1; display:flex; align-items:center;
+                                                                        justify-content:center; gap:3px; height:32px; overflow:hidden;">
+                                                                    </div>
+
+                                                                    <!-- Pausar / Reanudar -->
+                                                                    <button id="btnPausarGrab" onclick="pausarGrabacion()"
+                                                                            style="width:38px; height:38px; border-radius:50%; border:2px solid #667781;
+                                                                                background:none; cursor:pointer; display:flex; align-items:center;
+                                                                                justify-content:center; color:#667781; flex-shrink:0;">
+                                                                        <svg id="iconPausarGrab" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                                                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                                                        </svg>
+                                                                        <svg id="iconReanudarGrab" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                                                                            <path d="M8 5v14l11-7z"/>
+                                                                        </svg>
+                                                                    </button>
+
+                                                                </div>
+
+
+
+                                                            <button id="btnEnviarPrincipal"
+                                                                    class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center"
+                                                                    onclick="manejarEnvio()"
+                                                                    style="width: 45px; height: 40px; padding: 0;">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="white" viewBox="0 0 24 24">
+                                                                    <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z"/>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+
+                                                <!-- Panel de información -->
+                                                <div class="col-12 col-xl-3 d-none" id="colInfo">
+                                                    <div class="p-3 rounded h-100 d-flex flex-column"
+                                                        style="background-color: rgba(var(--bs-primary-rgb), 0.1)">
+
+                                                        <!-- Botón cerrar (solo móvil) -->
+                                                        <div class="text-end mb-2">
+                                                            <button class="btn btn-link text-muted p-0" onclick="toggleInfo()" title="Cerrar">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                                                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+
+                                                        <!-- Cabecera usuario -->
+                                                        <div class="text-center mb-4">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" fill="none" viewBox="0 0 24 24" style="color:#2D2A4A;">
+                                                                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" />
+                                                                <path d="M4 21c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" />
+                                                            </svg>
+                                                            <h6 class="mt-3 mb-0 fw-bold">+ 593 99 270 1234</h6>
+                                                            <small class="text-muted">Usuario</small>
+                                                        </div>
+
+                                                        <!-- Botones de acciones -->
+                                                        <div class="d-flex justify-content-around mb-4">
+                                                            <!-- Botón Imagen -->
+                                                            <button class="btn border-0 rounded p-2" style="background-color: rgba(var(--bs-primary-rgb), 0.2)"  onclick="abrirPanelMedia('multimedia')">
+                                                                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" style="color: rgba(var(--bs-primary-rgb), 1);">
+                                                                    <path d="M29.4995,12.3739c.7719-.0965,1.5437,.4824,1.5437,1.2543h0l2.5085,23.8312c.0965,.7719-.4824,1.5437-1.2543,1.5437l-23.7347,2.5085c-.7719,.0965-1.5437-.4824-1.5437-1.2543h0l-2.5085-23.7347c-.0965-.7719,.4824-1.5437,1.2543-1.5437l23.7347-2.605Z" />
+                                                                    <path d="M12.9045,18.9347c-1.7367,.193-3.0874,1.7367-2.8945,3.5699,.193,1.7367,1.7367,3.0874,3.5699,2.8945,1.7367-.193,3.0874-1.7367,2.8945-3.5699s-1.8332-3.0874-3.5699-2.8945h0Zm8.7799,5.596l-4.6312,5.6925c-.193,.193-.4824,.2894-.6754,.0965h0l-1.0613-.8683c-.193-.193-.5789-.0965-.6754,.0965l-5.0171,6.1749c-.193,.193-.193,.5789,.0965,.6754-.0965,.0965,.0965,.0965,.193,.0965l19.9719-2.1226c.2894,0,.4824-.2894,.4824-.5789,0-.0965-.0965-.193-.0965-.2894l-7.8151-9.0694c-.2894-.0965-.5789-.0965-.7719,.0965h0Z" />
+                                                                </svg>
+                                                            </button>
+
+                                                            <!-- Botón PDF -->
+                                                            <button class="btn border-0 rounded p-2"
+                                                                style="background-color: rgba(var(--bs-primary-rgb), 0.2)" onclick="abrirPanelMedia('documentos')">
+                                                                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"
+                                                                    width="26" height="26" fill="none" stroke="currentColor"
+                                                                    stroke-linecap="round" stroke-linejoin="round"
+                                                                    style="color: rgba(var(--bs-primary-rgb), 1);">
+
+                                                                    <!-- Marco -->
+                                                                    <rect x="12.8772" y="9.2878" width="23.3737" height="30.0519" rx="2.0054" ry="2.0054" />
+
+                                                                    <!-- Líneas horizontales -->
+                                                                    <path d="M16.6921,32.6919h13.7214M16.6921,29.5563h16.1546M16.6921,25.919h16.1546M16.6921,20.7264h16.1546" />
+
+                                                                    <!-- Detalle pequeño (esquina superior derecha) -->
+                                                                    <line x1="28.4318" y1="12.9115" x2="30.5405" y2="12.9115" />
+                                                                    <line x1="28.4318" y1="15.0202" x2="29.8024" y2="15.0202" />
+                                                                    <line x1="28.4318" y1="12.9115" x2="28.4318" y2="17.1289" />
+                                                                </svg>
+                                                            </button>
+
+
+                                                            <!-- Botón Link -->
+                                                            <button class="btn border-0 rounded p-2" style="background-color: rgba(var(--bs-primary-rgb), 0.2)" onclick="abrirPanelMedia('enlaces')">
+                                                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: rgba(var(--bs-primary-rgb), 1);">
+                                                                    <path d="M15.197 3.35462C16.8703 1.67483 19.4476 1.53865 20.9536 3.05046C22.4596 4.56228 22.3239 7.14956 20.6506 8.82935L18.2268 11.2626M10.0464 14C8.54044 12.4882 8.67609 9.90087 10.3494 8.22108L12.5 6.06212" />
+                                                                    <path d="M13.9536 10C15.4596 11.5118 15.3239 14.0991 13.6506 15.7789L11.2268 18.2121L8.80299 20.6454C7.12969 22.3252 4.55237 22.4613 3.0464 20.9495C1.54043 19.4377 1.67609 16.8504 3.34939 15.1706L5.77323 12.7373" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+
+
+                                                        <button id="btnOportunidad"
+                                                                class="btn w-100 d-flex align-items-center justify-content-between mb-4 p-3 rounded-3 border-0"
+                                                                style="background-color: rgba(var(--bs-primary-rgb), 0.1); transition: all 0.2s ease;"
+                                                                onmouseover="this.style.backgroundColor='rgba(var(--bs-primary-rgb), 0.18)'"
+                                                                onmouseout="this.style.backgroundColor='rgba(var(--bs-primary-rgb), 0.1)'"
+                                                                onclick="abrirModalOportunidad()">
+
+                                                            <div class="d-flex flex-column align-items-start gap-1">
+                                                                <span id="textoOportunidad" class="fw-semibold" 
+                                                                    style="font-size: 0.82rem; color: rgba(var(--bs-secundary-rgb), 1);">
+                                                                    Oportunidad
+                                                                </span>
+
+                                                                <!-- Badge de etapa -->
+                                                                <span id="badgeEtapa" style="display:none; font-size: 0.68rem; font-weight: 600;
+                                                                    padding: 2px 10px; border-radius: 20px; letter-spacing: 0.4px;">
+                                                                </span>
+                                                            </div>
+
+                                                            <!-- Icono trofeo -->
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"
+                                                                stroke-linecap="round" stroke-linejoin="round"
+                                                                style="color: rgba(var(--bs-primary-rgb), 1); flex-shrink:0;">
+                                                                <path d="M6 9H4a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1h3"/>
+                                                                <path d="M18 9h2a2 2 0 0 0 2-2V5a1 1 0 0 0-1-1h-3"/>
+                                                                <path d="M12 17c-3.31 0-6-2.69-6-6V4h12v7c0 3.31-2.69 6-6 6z"/>
+                                                                <path d="M12 17v4"/>
+                                                                <path d="M8 21h8"/>
+                                                            </svg>
+                                                        </button>
+
+                                                        <div class="modal fade" id="modalOportunidad" tabindex="-1">
+                                                            <div class="modal-dialog modal-dialog-centered">
+                                                                <div class="modal-content border-0 shadow">
+
+                                                                    <div class="modal-header bg-primary border-0">
+                                                                        <h6 class="modal-title fw-bold text-white" id="modalOportunidadTitulo">Nueva Oportunidad</h6>
+                                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                    </div>
+
+                                                                    <div class="modal-body">
+
+                                                                        <!-- Info del contacto (solo lectura) -->
+                                                                        <div class="d-flex align-items-center gap-3 p-3 rounded mb-3"
+                                                                            style="background-color: rgba(var(--bs-primary-rgb), 0.08);">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"
+                                                                                fill="none" viewBox="0 0 24 24"
+                                                                                style="color: rgba(var(--bs-primary-rgb), 0.7);">
+                                                                                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
+                                                                                <path d="M4 21c0-4 4-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.5"/>
+                                                                            </svg>
+                                                                            <div>
+                                                                                <div class="fw-semibold" id="oportunidadNombreContacto" style="font-size:0.9rem;"></div>
+                                                                                <div class="text-muted" id="oportunidadNumeroContacto" style="font-size:0.8rem;"></div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <!-- Etapa (solo al ver/editar) -->
+                                                                        <div id="campoEtapa" style="display:none;" class="mb-3">
+                                                                            <label class="form-label fw-semibold" style="font-size:0.82rem;">Etapa</label>
+                                                                            <select id="selectEtapa" class="form-select form-select-sm">
+                                                                                <option value="nuevo">Nuevo</option>
+                                                                                <option value="conversacion">En conversación</option>
+                                                                                <option value="propuesta">Propuesta enviada</option>
+                                                                                <option value="ganado">Ganado</option>
+                                                                                <option value="perdido">Perdido</option>
+                                                                            </select>
+                                                                        </div>
+
+                                                                        <!-- Notas -->
+                                                                        <div class="mb-3">
+                                                                            <label class="form-label fw-semibold" style="font-size:0.82rem;">Notas <span class="text-muted fw-normal">(opcional)</span></label>
+                                                                            <textarea id="oportunidadNotas" class="form-control form-control-sm"
+                                                                                    rows="3" placeholder="Ej: Cliente interesado en el plan premium..."></textarea>
+                                                                        </div>
+
+                                                                    </div>
+
+                                                                    <div class="modal-footer border-0 pt-0">
+                                                                        <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancelar</button>
+                                                                        <button type="button" class="btn btn-sm btn-primary px-4" id="btnAccionOportunidad"
+                                                                                onclick="guardarOportunidad()">
+                                                                            Crear oportunidad
+                                                                        </button>
+                                                                    </div>
+
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Eliminar chat -->
+                                                        <div class="text-center mt-auto pt-3 border-top">
+                                                            <button class="btn border-0 text-danger fw-semibold mt-0" style="font-size: 0.80rem;" onclick="confirmarEliminarChat()">
+                                                                <svg viewBox="0 0 24 24" fill="currentColor"
+                                                                    xmlns="http://www.w3.org/2000/svg"
+                                                                    width="16" height="16" class="me-1">
+                                                                    <path d="M2.75 6.16667C2.75 5.70644 3.09538 5.33335 3.52143 5.33335L6.18567 5.3329C6.71502 5.31841 7.18202 4.95482 7.36214 4.41691C7.36688 4.40277 7.37232 4.38532 7.39185 4.32203L7.50665 3.94993C7.5769 3.72179 7.6381 3.52303 7.72375 3.34536C8.06209 2.64349 8.68808 2.1561 9.41147 2.03132C9.59457 1.99973 9.78848 1.99987 10.0111 2.00002H13.4891C13.7117 1.99987 13.9056 1.99973 14.0887 2.03132C14.8121 2.1561 15.4381 2.64349 15.7764 3.34536C15.8621 3.52303 15.9233 3.72179 15.9935 3.94993L16.1083 4.32203C16.1279 4.38532 16.1333 4.40277 16.138 4.41691C16.3182 4.95482 16.8778 5.31886 17.4071 5.33335H19.9786C20.4046 5.33335 20.75 5.70644 20.75 6.16667C20.75 6.62691 20.4046 7 19.9786 7H3.52143C3.09538 7 2.75 6.62691 2.75 6.16667Z" />
+                                                                    <path opacity="0.5" d="M11.6068 21.9998H12.3937C15.1012 21.9998 16.4549 21.9998 17.3351 21.1366C18.2153 20.2734 18.3054 18.8575 18.4855 16.0256L18.745 11.945C18.8427 10.4085 18.8916 9.6402 18.45 9.15335C18.0084 8.6665 17.2628 8.6665 15.7714 8.6665H8.22905C6.73771 8.6665 5.99204 8.6665 5.55047 9.15335C5.10891 9.6402 5.15777 10.4085 5.25549 11.945L5.515 16.0256C5.6951 18.8575 5.78515 20.2734 6.66534 21.1366C7.54553 21.9998 8.89927 21.9998 11.6068 21.9998Z" />
+                                                                </svg>
+                                                                Eliminar chat
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+
+                                                <div class="col" id="colOportunidades" style="display: none;">
+                                                    <div class="h-100 d-flex flex-column" style="background: var(--bs-body-bg);">
+
+                                                        <!-- ── HEADER ── -->
+                                                        <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+                                                            style="background: var(--bs-body-bg);">
+
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <h6 class="mb-0 fw-bold" style="font-size: 0.95rem;">Oportunidades</h6>
+                                                                <span id="oport-total-badge"
+                                                                    class="badge rounded-pill"
+                                                                    style="background: rgba(var(--bs-primary-rgb), 0.12);
+                                                                            color: var(--bs-primary); font-size: 0.7rem; font-weight: 600;">
+                                                                    0
+                                                                </span>
+                                                            </div>
+
+                                                            <div class="d-flex align-items-center gap-2">
+
+                                                                <!-- Toggle kanban / lista -->
+                                                                <div class="d-flex gap-1 p-1 rounded"
+                                                                    style="background: rgba(var(--bs-primary-rgb), 0.08);">
+                                                                    <button id="oport-btn-kanban"
+                                                                            onclick="oportSetVista('kanban')"
+                                                                            class="btn btn-sm border-0 p-1 rounded"
+                                                                            style="background:#fff; color: var(--bs-primary);
+                                                                                box-shadow: 0 1px 4px rgba(0,0,0,0.08);"
+                                                                            title="Kanban">
+                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                                                                            stroke="currentColor" stroke-width="2">
+                                                                            <rect x="3" y="3" width="7" height="18" rx="1"/>
+                                                                            <rect x="14" y="3" width="7" height="11" rx="1"/>
+                                                                            <rect x="14" y="17" width="7" height="4" rx="1"/>
+                                                                        </svg>
+                                                                    </button>
+                                                                    <button id="oport-btn-lista"
+                                                                            onclick="oportSetVista('lista')"
+                                                                            class="btn btn-sm border-0 p-1 rounded"
+                                                                            style="background: transparent; color: var(--bs-secondary-color);"
+                                                                            title="Lista">
+                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                                                                            stroke="currentColor" stroke-width="2">
+                                                                            <line x1="8" y1="6" x2="21" y2="6"/>
+                                                                            <line x1="8" y1="12" x2="21" y2="12"/>
+                                                                            <line x1="8" y1="18" x2="21" y2="18"/>
+                                                                            <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                                                            <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                                                            <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+
+                                                                <!-- Nueva oportunidad -->
+                                                                <button class="btn btn-primary btn-sm d-flex align-items-center gap-1"
+                                                                        style="border-radius: 10px; font-size: 0.8rem; font-weight: 600; padding: 6px 14px;"
+                                                                        onclick="oportAbrirPanel()">
+                                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                                                        stroke="currentColor" stroke-width="2.5">
+                                                                        <line x1="12" y1="5" x2="12" y2="19"/>
+                                                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                                                    </svg>
+                                                                    Nueva
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- ── FILTROS ── -->
+                                                        <div class="d-flex gap-2 px-3 py-2 border-bottom flex-wrap align-items-center"
+                                                            style="background: var(--bs-body-bg);">
+                                                            <input type="text" id="oport-filtro-texto"
+                                                                class="form-control form-control-sm"
+                                                                placeholder="Buscar oportunidad..."
+                                                                style="max-width:180px; border-radius:8px; font-size:0.78rem;"
+                                                                oninput="oportFiltrar()">
+                                                            <select class="form-select form-select-sm" id="oport-filtro-vendedor"
+                                                                    style="max-width:160px; border-radius:8px; font-size:0.78rem;"
+                                                                    onchange="oportFiltrar()">
+                                                                <option value="">Todos los vendedores</option>
+                                                            </select>
+                                                            <select class="form-select form-select-sm" id="oport-filtro-stage"
+                                                                    style="max-width:150px; border-radius:8px; font-size:0.78rem;"
+                                                                    onchange="oportFiltrar()">
+                                                                <option value="">Todas las etapas</option>
+                                                                <option value="nuevo">Nuevo</option>
+                                                                <option value="contactado">Contactado</option>
+                                                                <option value="propuesta">Propuesta</option>
+                                                                <option value="negociacion">Negociación</option>
+                                                                <option value="ganado">Ganado</option>
+                                                                <option value="perdido">Perdido</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <!-- ══════════════════════════════
+                                                            VISTA KANBAN
+                                                        ══════════════════════════════ -->
+                                                        <div id="oport-vista-kanban"
+                                                            style="overflow-x: auto; display: flex; gap: 12px;
+                                                                    padding: 16px; flex: 1; align-items: flex-start;">
+
+                                                            <!-- Genera columnas dinámicamente via JS -->
+
+                                                        </div>
+
+                                                        <!-- ══════════════════════════════
+                                                            VISTA LISTA
+                                                        ══════════════════════════════ -->
+                                                        <div id="oport-vista-lista" style="display:none; padding: 16px; flex: 1; overflow-y: auto;">
+                                                            <div class="rounded" style="border: 1px solid var(--bs-border-color); overflow: hidden;">
+                                                                <table class="table mb-0" style="font-size: 0.82rem;">
+                                                                    <thead style="background: rgba(var(--bs-primary-rgb), 0.06);">
+                                                                        <tr>
+                                                                            <th style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                                                                    letter-spacing:0.04em; color: var(--bs-secondary-color);
+                                                                                    padding: 10px 14px; border-bottom: 1.5px solid var(--bs-border-color);">
+                                                                                Título
+                                                                            </th>
+                                                                            <th style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                                                                    letter-spacing:0.04em; color: var(--bs-secondary-color);
+                                                                                    padding: 10px 14px; border-bottom: 1.5px solid var(--bs-border-color);">
+                                                                                Contacto
+                                                                            </th>
+                                                                            <th style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                                                                    letter-spacing:0.04em; color: var(--bs-secondary-color);
+                                                                                    padding: 10px 14px; border-bottom: 1.5px solid var(--bs-border-color);">
+                                                                                Etapa
+                                                                            </th>
+                                                                            <th style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                                                                    letter-spacing:0.04em; color: var(--bs-secondary-color);
+                                                                                    padding: 10px 14px; border-bottom: 1.5px solid var(--bs-border-color);">
+                                                                                Vendedor
+                                                                            </th>
+                                                                            <th style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                                                                                    letter-spacing:0.04em; color: var(--bs-secondary-color);
+                                                                                    padding: 10px 14px; border-bottom: 1.5px solid var(--bs-border-color);">
+                                                                                Fecha
+                                                                            </th>
+                                                                            <th style="border-bottom: 1.5px solid var(--bs-border-color);"></th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody id="oport-tabla-body"></tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+
+
+                                                <!-- ══════════════════════════════════════
+                                                    PANEL NUEVA / EDITAR OPORTUNIDAD
+                                                ══════════════════════════════════════ -->
+                                                <div id="panelOportunidad" style="display:none; position:fixed; inset:0; z-index:9999;">
+
+                                                    <!-- Overlay -->
+                                                    <div onclick="oportCerrarPanel()"
+                                                        style="position:absolute; inset:0; background:rgba(255,255,255,0.5);"></div>
+
+                                                    <!-- Box -->
+                                                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+                                                                width:90%; max-width:460px;
+                                                                background: var(--bs-body-bg); color: var(--bs-body-color);
+                                                                border-radius:16px; overflow:hidden; display:flex; flex-direction:column;
+                                                                box-shadow: 0 20px 60px rgba(0,0,0,.2);">
+
+                                                        <!-- Header -->
+                                                        <div style="padding:16px 20px; display:flex; align-items:center; gap:12px;
+                                                                    background: var(--bs-primary);
+                                                                    border-bottom: 1px solid var(--bs-border-color);">
+                                                            <button onclick="oportCerrarPanel()" class="btn btn-link p-0" style="color:#fff;">
+                                                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                                                                    <path d="M18 6L6 18M6 6L18 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                                                                </svg>
+                                                            </button>
+                                                            <h6 id="oport-panel-titulo" class="mb-0 fw-bold text-white" style="font-size:.95rem;">
+                                                                Nueva oportunidad
+                                                            </h6>
+                                                        </div>
+
+                                                        <!-- Body -->
+                                                        <div style="padding:20px; overflow-y:auto; max-height:70vh;
+                                                                    display:flex; flex-direction:column; gap:14px;">
+
+                                                            <!-- Título -->
+                                                            <div>
+                                                                <label class="form-label" style="font-size:0.8rem; color:var(--bs-secondary-color); margin-bottom:5px;">
+                                                                    Título de la oportunidad
+                                                                </label>
+                                                                <input type="text" id="oport-input-titulo" class="form-control form-control-sm"
+                                                                    placeholder="Ej: Renovación contrato anual"
+                                                                    style="border-radius:10px; font-size:0.88rem;">
+                                                            </div>
+
+                                                            <!-- Contacto -->
+                                                            <div>
+                                                                <label class="form-label" style="font-size:0.8rem; color:var(--bs-secondary-color); margin-bottom:5px;">
+                                                                    Contacto (número)
+                                                                </label>
+                                                                <div style="display: flex; align-items: stretch; max-width: 480px;">
+                                                                    <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f5f3ff; border: 1px solid #d1d5db; border-right: none; border-radius: 8px 0 0 8px; font-size: 0.88rem; font-weight: 700; color: #3730a3; white-space: nowrap; flex-shrink: 0;">
+                                                                        <img src="https://flagcdn.com/w20/ec.png" srcset="https://flagcdn.com/w40/ec.png 2x" width="20" height="14" alt="Ecuador" style="border-radius: 2px; display: inline-block;">
+                                                                        +593
+                                                                    </div>
+                                                                    <input type="text" id="oport-input-contacto" class="form-control form-control-sm" placeholder="9XXXXXXXX" maxlength="10" style="border-radius: 0 8px 8px 0; border-left: none; font-size: 0.88rem; padding-left: 10px;">
+                                                                </div>
+                                                                <div id="phone-hint-oport" style="margin-top: 5px; font-size: 0.77rem; color: #888;">
+                                                                    Ingresa sin el 0 inicial. Ej: 999123456
+                                                                </div>
+                                                                <script>
+                                                                    document.getElementById('oport-input-contacto').addEventListener('input', function() {
+                                                                        let val = this.value.replace(/\\D/g, '');
+                                                                        if (val.startsWith('0')) val = val.substring(1);
+                                                                        this.value = val;
+                                                                    });
+                                                                </script>
+                                                            </div>
+
+                                                            <!-- Etapa -->
+                                                            <div>
+                                                                <label class="form-label" style="font-size:0.8rem; color:var(--bs-secondary-color); margin-bottom:8px;">
+                                                                    Etapa
+                                                                </label>
+                                                                <div class="d-flex gap-2 flex-wrap" id="oport-stage-pills">
+                                                                    <!-- generadas por JS -->
+                                                                </div>
+                                                                <input type="hidden" id="oport-input-stage" value="nuevo">
+                                                            </div>
+
+                                                            <!-- Vendedor -->
+                                                            <div>
+                                                                <label class="form-label" style="font-size:0.8rem; color:var(--bs-secondary-color); margin-bottom:5px;">
+                                                                    Asignar vendedor
+                                                                </label>
+                                                                <select id="oport-input-vendedor" class="form-select form-select-sm"
+                                                                        style="border-radius:10px; font-size:0.88rem;">
+                                                                    <option value="">Sin asignar</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <!-- Anotaciones -->
+                                                            <div>
+                                                                <label class="form-label" style="font-size:0.8rem; color:var(--bs-secondary-color); margin-bottom:5px;">
+                                                                    Anotaciones
+                                                                </label>
+                                                                <textarea id="oport-input-notas" class="form-control form-control-sm"
+                                                                        placeholder="Notas de seguimiento..."
+                                                                        rows="3"
+                                                                        style="border-radius:10px; font-size:0.88rem; resize:none;"></textarea>
+                                                            </div>
+
+                                                        </div>
+
+                                                        <!-- Footer -->
+                                                        <div style="padding:14px 20px; display:flex; gap:10px; justify-content:flex-end;
+                                                                    border-top: 1px solid var(--bs-border-color);">
+                                                            <button onclick="oportCerrarPanel()"
+                                                                    class="btn btn-sm"
+                                                                    style="border-radius:8px; padding:7px 18px;
+                                                                        border: 1px solid var(--bs-border-color);
+                                                                        font-size:0.82rem;">
+                                                                Cancelar
+                                                            </button>
+                                                            <button onclick="oportGuardar()"
+                                                                    id="oport-btn-guardar"
+                                                                    class="btn btn-primary btn-sm"
+                                                                    style="border-radius:8px; padding:7px 18px; font-size:0.82rem; font-weight:600;">
+                                                                Guardar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+
+
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                        </div>
+                        
+
+                    </div>
+        </div>
+
+
+        
+    
+        
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="../../../lib/jquery/plugins/select2/jquery-select2.min.js"></script>
+        <script>
+            $(document).ready(function() {
+                $("#tarifaInsert").select2({});
+            });
+        </script>
+
+        </div>
+
+    
+
+        <div class="position-fixed mt-5 top-0 end-0 p-3 animate__animated animate__heartBeat animate__delay-4s" style="z-index: 11">
+            <div id="liveToastServicioInternet" class="toast bg-danger text-white" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header bg-danger text-white">
+                    <strong class="me-auto ">Aviso del Servicio</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div id="p_body_toast" class="toast-body">
+                    <p id="p_msgServicioConsultaInternet">No hay Internet</p>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="position-fixed mt-5 top-0 end-0 p-3 animate__animated animate__heartBeat animate__delay-1s" style="z-index: 11">
+            <div id="liveToast" class="toast " role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header bg-primary">
+                    <strong class="me-auto text-white">Aviso Sistema</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div id="p_body_toast" class="toast-body text-black">
+                    <p id="p_msg">Hola toast</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="position-fixed mt-5 top-0 end-0 p-3 animate__animated animate__heartBeat animate__delay-1s" style="z-index: 11">
+            <div id="liveToastEnvioComprobante" class="toast bg-info text-white" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header bg-info text-white">
+                    <strong class="me-auto ">Aviso del Servicio</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div id="p_body_toast" class="toast-body">
+                    <p id="p_msgEnvioComprobante"> <img src="">
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Media -->
+        <div id="panelMediaFiles" style="display:none;position:fixed;inset:0;z-index:9999">
+
+            <div onclick="cerrarPanelMedia()" style="position:absolute;inset:0;background:rgba(255, 255, 255, 0.5)"></div>
+
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                width:90%;max-width:500px;height:70vh;max-height:600px;
+                background:var(--bs-body-bg);color:var(--bs-body-color);
+                border-radius:16px;overflow:hidden;display:flex;flex-direction:column;
+                box-shadow:0 20px 60px rgba(0,0,0,.3)">
+
+                <div style="padding:16px 20px;display:flex;align-items:center;gap:12px;
+                    background:var(--bs-primary);color:var(--bs-primary-text-emphasis);
+                    border-bottom:1px solid var(--bs-border-color)">
+
+                    <button onclick="cerrarPanelMedia()" class="btn btn-link p-0" style="color:inherit">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6L18 18"
+                                stroke="#ffff" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+
+                    <h6 id="panelMediaTitle" class="mb-0 fw-bold text-white" style="font-size:.95rem"></h6>
+                </div>
+
+                <div id="panelMediaContent" style="padding:16px;overflow-y:auto;flex:1"></div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmar Eliminar Chat -->
+        <div id="modalEliminarChat" style="display:none;position:fixed;inset:0;z-index:9999">
+
+            <div onclick="cerrarModalEliminar()" style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                width:90%;max-width:400px;background:var(--bs-body-bg);color:var(--bs-body-color);
+                border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+                text-align:center;padding:30px 24px">
+
+                <!-- Icono -->
+                <div style="width:64px;height:64px;margin:0 auto 16px;
+                    background:rgba(var(--bs-danger-rgb),.15);
+                    border-radius:50%;display:flex;align-items:center;justify-content:center">
+
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                        style="color:var(--bs-danger)">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="10" y1="11" x2="10" y2="17"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="14" y1="11" x2="14" y2="17"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+
+                <h6 class="fw-bold mb-2">¿Eliminar esta conversación?</h6>
+
+                <p style="color:var(--bs-secondary-color);font-size:.85rem;margin-bottom:24px">
+                    Se eliminarán todos los mensajes de este chat. Esta acción no se puede deshacer.
+                </p>
+
+                <div style="display:flex;gap:10px">
+                    <button onclick="cerrarModalEliminar()"
+                        style="flex:1;padding:10px;border:1px solid var(--bs-border-color);
+                        background:var(--bs-body-bg);border-radius:10px;font-weight:500;font-size:.9rem">
+                        Cancelar
+                    </button>
+
+                    <button id="btnConfirmarEliminar" onclick="ejecutarEliminarChat()"
+                        style="flex:1;padding:10px;border:none;background:var(--bs-danger);
+                        color:#fff;border-radius:10px;font-weight:600;font-size:.9rem">
+                        Sí, eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmar Eliminar Contacto -->
+        <div id="modalEliminarContacto" style="display:none;position:fixed;inset:0;z-index:9999">
+
+            <div onclick="cerrarModalEliminarContacto()" 
+                style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                        width:90%;max-width:400px;background:var(--bs-body-bg);color:var(--bs-body-color);
+                        border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+                        text-align:center;padding:30px 24px">
+
+                <div style="width:64px;height:64px;margin:0 auto 16px;
+                            background:rgba(var(--bs-danger-rgb),.15);
+                            border-radius:50%;display:flex;align-items:center;justify-content:center">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style="color:var(--bs-danger)">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="10" y1="11" x2="10" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="14" y1="11" x2="14" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+
+                <h6 class="fw-bold mb-2">¿Eliminar este contacto?</h6>
+
+                <p style="color:var(--bs-secondary-color);font-size:.85rem;margin-bottom:24px">
+                    Se eliminará el nombre guardado. El chat y los mensajes se conservan.
+                    Esta acción no se puede deshacer.
+                </p>
+
+                <div style="display:flex;gap:10px">
+                    <button onclick="cerrarModalEliminarContacto()"
+                            style="flex:1;padding:10px;border:1px solid var(--bs-border-color);
+                                background:var(--bs-body-bg);border-radius:10px;
+                                font-weight:500;font-size:.9rem">
+                        Cancelar
+                    </button>
+                    <button id="btnConfirmarEliminarContacto"
+                            style="flex:1;padding:10px;border:none;background:var(--bs-danger);
+                                color:#fff;border-radius:10px;font-weight:600;font-size:.9rem">
+                        Sí, eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+
+    </div>
+        
+        <script type="text/javascript">
+        </script>
+
+        <!-- SDK de Facebook para Embedded Signup -->
+        <div id="fb-root"></div>
+
+        <script>
+            // ============================================
+            // SISTEMA DE LOGS MEJORADO
+            // ============================================
+            const consoleLogs = [];
+            
+            function logWhatsApp(message, type = 'INFO') {
+                const timestamp = new Date().toISOString();
+                const logEntry = `[${timestamp}] [${type}] ${message}`;
+                
+                console.log(`%c${logEntry}`, 
+                    type === 'ERROR' ? 'color: red; font-weight: bold' : 
+                    type === 'SUCCESS' ? 'color: green; font-weight: bold' : 
+                    type === 'API' ? 'color: blue; font-weight: bold' : 
+                    'color: black');
+                
+                consoleLogs.push(logEntry);
+            }
+
+            logWhatsApp('Sistema de WhatsApp cargado', 'INFO');
+
+            // ============================================
+            // LISTENER PARA MENSAJES DEL POPUP DE WHATSAPP
+            // ============================================
+            window.addEventListener('message', (event) => {
+                logWhatsApp(`Mensaje recibido de origen: ${event.origin}`, 'INFO');
+                
+                if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") {
+                    logWhatsApp(`Origen rechazado: ${event.origin}`, 'ERROR');
+                    return;
+                }
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    logWhatsApp('Datos parseados correctamente', 'SUCCESS');
+                    logWhatsApp(`Tipo de evento: ${data.type}`, 'INFO');
+                    
+                    if (data.type === 'WA_EMBEDDED_SIGNUP') {
+                        logWhatsApp('Evento WA_EMBEDDED_SIGNUP detectado', 'SUCCESS');
+                        
+                        if (data.event === 'FINISH') {
+                            logWhatsApp('✓ Usuario completó el flujo de signup', 'SUCCESS');
+                            const {phone_number_id, waba_id} = data.data;
+                            logWhatsApp(`Phone Number ID: ${phone_number_id}`, 'INFO');
+                            logWhatsApp(`WABA ID: ${waba_id}`, 'INFO');
+                            
+                            // Guardar estos datos para enviar al backend
+                            window.whatsappData = {
+                                phone_number_id: phone_number_id,
+                                waba_id: waba_id
+                            };
+                            
+                        } else if (data.event === 'CANCEL') {
+                            logWhatsApp('✗ Usuario canceló el flujo', 'ERROR');
+                            const {current_step} = data.data;
+                            logWhatsApp(`Cancelado en paso: ${current_step}`, 'INFO');
+                            
+                        } else if (data.event === 'ERROR') {
+                            logWhatsApp('✗ Error en el flujo de signup', 'ERROR');
+                            const {error_message} = data.data;
+                            logWhatsApp(`Error: ${error_message}`, 'ERROR');
+                        }
+                    }
+                    
+                } catch (error) {
+                    logWhatsApp(`Error parseando JSON: ${error.message}`, 'ERROR');
+                    logWhatsApp(`Datos recibidos: ${event.data}`, 'INFO');
+                }
+            });
+
+            // ============================================
+            // CALLBACK DEL SDK DE FACEBOOK (SIN ASYNC) 
+            // ============================================
+            const fbLoginCallback = (response) => {
+                logWhatsApp('fbLoginCallback ejecutado', 'INFO');
+                logWhatsApp(`AuthResponse presente: ${!!response.authResponse}`, 'INFO');
+                
+                if (response.authResponse) {
+                    logWhatsApp('✓ Autenticación exitosa', 'SUCCESS');
+                    const code = response.authResponse.code;
+                    logWhatsApp(`Code obtenido: ${code.substring(0, 20)}...`, 'INFO');
+                    
+                    // Mostrar loader
+                    showWhatsAppLoader('Conectando tu cuenta de WhatsApp...');
+                    
+                    // Llamar función async separada
+                    handleWhatsAppAuth(code);
+                    
+                } else {
+                    logWhatsApp('✗ No se recibió authResponse', 'ERROR');
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error de autenticación',
+                            text: 'No se pudo completar la autenticación con Facebook.',
+                        });
+                    } else {
+                        alert('Error de autenticación con Facebook');
+                    }
+                }
+            }
+
+            // ============================================
+            // MANEJAR AUTENTICACIÓN (ASYNC SEPARADA) 
+            // ============================================
+            async function handleWhatsAppAuth(code) {
+                // Esperar a tener los datos de WhatsApp
+                if (window.whatsappData) {
+                    logWhatsApp('Datos de WhatsApp disponibles, enviando al backend...', 'INFO');
+                    await sendToBackend(code, window.whatsappData);
+                } else {
+                    logWhatsApp('Esperando datos de WhatsApp...', 'INFO');
+                    // Intentar de nuevo después de 2 segundos
+                    setTimeout(async () => {
+                        if (window.whatsappData) {
+                            logWhatsApp('Datos de WhatsApp recibidos, enviando al backend...', 'INFO');
+                            await sendToBackend(code, window.whatsappData);
+                        } else {
+                            logWhatsApp('✗ No se recibieron datos de WhatsApp', 'ERROR');
+                            hideWhatsAppLoader();
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: 'No se recibieron los datos de WhatsApp. Por favor intenta de nuevo.',
+                                });
+                            } else {
+                                alert('No se recibieron los datos de WhatsApp');
+                            }
+                        }
+                    }, 2000);
+                }
+            }
+
+            // ============================================
+            // ENVIAR AL BACKEND
+            // ============================================
+            async function sendToBackend(code, whatsappData) {
+                logWhatsApp('=== ENVIANDO DATOS AL BACKEND ===', 'API');
+                
+                const payload = {
+                    code: code,
+                    phone_number_id: whatsappData.phone_number_id,
+                    waba_id: whatsappData.waba_id
+                };
+                
+                logWhatsApp(`Payload: ${JSON.stringify(payload, null, 2)}`, 'API');
+                
+                try {
+                    const response = await fetch('./embedded_signup_callback.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    logWhatsApp(`Response status: ${response.status}`, 'API');
+                    
+                    const responseText = await response.text();
+                    logWhatsApp(`Response RAW: ${responseText}`, 'API');
+
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                        logWhatsApp('Respuesta del backend recibida', 'SUCCESS');
+                    } catch (e) {
+                        logWhatsApp('ERROR: La respuesta no es JSON válido', 'ERROR');
+                        logWhatsApp(`Error HTML: ${responseText.substring(0, 500)}`, 'ERROR');
+                        hideWhatsAppLoader();
+                        alert('Error del servidor. Revisa la consola (F12)');
+                        return;
+                    }
+                    logWhatsApp(`Result: ${JSON.stringify(result, null, 2)}`, 'API');
+                    
+                    hideWhatsAppLoader();
+                    
+                    if (result.success) {
+                        logWhatsApp('✓✓✓ PROCESO COMPLETADO EXITOSAMENTE ✓✓✓', 'SUCCESS');
+                        
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Cuenta conectada!',
+                                html: `
+                                    <p>Tu cuenta de WhatsApp se ha conectado exitosamente.</p>
+                                    <p class="mb-0"><strong>Número:</strong> ${result.data.display_number || 'N/A'}</p>
+                                    <p class="mb-0"><strong>Negocio:</strong> ${result.data.verified_name || 'N/A'}</p>
+                                `,
+                                confirmButtonText: 'Continuar'
+                            }).then(() => {
+                                window.location.reload();
+                            });
+                        } else {
+                            alert('¡Cuenta de WhatsApp conectada exitosamente!');
+                            window.location.reload();
+                        }
+                        
+                    } else {
+                        logWhatsApp('✗ Error en el backend', 'ERROR');
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error al conectar',
+                                text: result.error || 'Ocurrió un error desconocido',
+                            });
+                        } else {
+                            alert('Error: ' + (result.error || 'Ocurrió un error desconocido'));
+                        }
+                    }
+                    
+                } catch (error) {
+                    logWhatsApp(`✗ Error en fetch: ${error.message}`, 'ERROR');
+                    hideWhatsAppLoader();
+                    
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error de conexión',
+                            text: 'No se pudo comunicar con el servidor. Por favor verifica tu conexión.',
+                        });
+                    } else {
+                        alert('Error de conexión con el servidor');
+                    }
+                }
+            }
+
+            // ============================================
+            // LANZAR EL SIGNUP DE WHATSAPP
+            // ============================================
+            function launchWhatsAppSignup() {
+                logWhatsApp('=== INICIANDO WHATSAPP SIGNUP ===', 'INFO');
+                logWhatsApp('Lanzando popup de Facebook...', 'INFO');
+                
+                // Verificar si FB está cargado
+                if (typeof FB === 'undefined') {
+                    logWhatsApp('ERROR: SDK de Facebook no está cargado', 'ERROR');
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'El SDK de Facebook no está cargado. Por favor recarga la página.',
+                        });
+                    } else {
+                        alert('Error: SDK de Facebook no cargado');
+                    }
+                    return;
+                }
+                
+                FB.login(fbLoginCallback, {
+                    config_id: 'AQUI_TU_NUEVO_CONFIG_ID',
+                    response_type: 'code',
+                    override_default_response_type: true,
+                    extras: {"version":"v3","setup":{}}
+                });
+                
+                logWhatsApp('FB.login() ejecutado', 'INFO');
+            }
+
+            // ============================================
+            // FUNCIONES AUXILIARES DE UI
+            // ============================================
+            function showWhatsAppLoader(message = 'Procesando...') {
+                const loaderHtml = `
+                    <div id="whatsapp-loader-overlay" style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.7);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 99999;
+                    ">
+                        <div style="
+                            background: white;
+                            padding: 30px;
+                            border-radius: 10px;
+                            text-align: center;
+                        ">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3 mb-0">${message}</p>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', loaderHtml);
+            }
+
+            function hideWhatsAppLoader() {
+                const loader = document.getElementById('whatsapp-loader-overlay');
+                if (loader) {
+                    loader.remove();
+                }
+            }
+
+            // ============================================
+            // DESCONECTAR WHATSAPP
+            // ============================================
+            async function disconnectWhatsApp() {
+                logWhatsApp('=== INICIANDO DESCONEXIÓN DE WHATSAPP ===', 'INFO');
+                
+                // Confirmar con el usuario
+                const confirmResult = await Swal.fire({
+                    title: '¿Desconectar WhatsApp?',
+                    text: 'Se desactivará la cuenta de WhatsApp. Tendrás que reconectar para enviar mensajes.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, desconectar',
+                    cancelButtonText: 'Cancelar'
+                });
+
+                if (!confirmResult.isConfirmed) {
+                    logWhatsApp('Desconexión cancelada por el usuario', 'INFO');
+                    return;
+                }
+
+                showWhatsAppLoader('Desconectando WhatsApp...');
+
+                try {
+                    const response = await fetch('disconnect_whatsapp.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+                    
+                    hideWhatsAppLoader();
+
+                    if (result.success) {
+                        logWhatsApp('✓ Desconexión exitosa', 'SUCCESS');
+                        
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Desconectado',
+                            text: 'WhatsApp ha sido desconectado exitosamente',
+                            timer: 2000
+                        });
+                        
+                        window.location.reload();
+                        
+                    } else {
+                        logWhatsApp('✗ Error al desconectar', 'ERROR');
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: result.error || 'No se pudo desconectar WhatsApp'
+                        });
+                    }
+                    
+                } catch (error) {
+                    logWhatsApp(`✗ Error en desconexión: ${error.message}`, 'ERROR');
+                    hideWhatsAppLoader();
+                    
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de conexión',
+                        text: 'No se pudo comunicar con el servidor'
+                    });
+                }
+            }
+        </script>
+
+
+        <!-- Inicialización del SDK de Facebook -->
+        <script>
+            logWhatsApp('Inicializando SDK de Facebook...', 'INFO');
+            
+            window.fbAsyncInit = function() {
+                FB.init({
+                    appId            : 'AQUI_TU_NUEVO_APP_ID',
+                    autoLogAppEvents : true,
+                    xfbml            : true,
+                    version          : 'v24.0'
+                });
+                logWhatsApp('✓ SDK de Facebook inicializado', 'SUCCESS');
+            };
+        </script>
+
+        <script>
+            async function consultarDatosMeta() {
+                try {
+                    const response = await fetch('get_whatsapp_profile.php');
+                    const data = await response.json();
+
+                    if (data.about || data.profile_picture_url) {
+                        // Actualizar la frase de "Info"
+                        const infoText = document.querySelector('#colPerfil .info-text');
+                        if (infoText && data.about) {
+                            infoText.innerText = data.about;
+                        }
+
+                        // Actualizar la foto de perfil
+                        const imgAvatar = document.querySelector('#colPerfil .perfil-avatar img');
+                        if (imgAvatar && data.profile_picture_url) {
+                            imgAvatar.src = data.profile_picture_url;
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error al consultar datos de Meta:", error);
+                }
+            }
+
+        </script>
+
+        <script>
+function buscarConversacion(texto) {
+    const termino = texto.toLowerCase().trim();
+    const wrappers = document.querySelectorAll('.chat-item-wrapper');
+    let encontrados = 0;
+
+    wrappers.forEach(wrapper => {
+        if (!termino) {
+            wrapper.style.display = '';
+            encontrados++;
+            return;
+        }
+        const textoVisible = wrapper.innerText.toLowerCase();
+        const coincide = textoVisible.includes(termino);
+        wrapper.style.display = coincide ? '' : 'none';
+        if (coincide) encontrados++;
+    });
+
+    // Feedback visual
+    let sinResultados = document.getElementById('sinResultadosBusqueda');
+    if (!sinResultados) {
+        const chatList = document.querySelector('.chat-list');
+        chatList.insertAdjacentHTML('afterend', `
+            <div id="sinResultadosBusqueda" style="display:none; text-align:center; padding:24px 12px; color:var(--bs-secondary-color);">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.3; margin-bottom:8px;">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+                <div style="font-size:0.8rem;">Sin resultados para "<span id="terminoBusqueda"></span>"</div>
+            </div>
+        `);
+        sinResultados = document.getElementById('sinResultadosBusqueda');
+    }
+
+    if (termino && encontrados === 0) {
+        document.getElementById('terminoBusqueda').textContent = texto;
+        sinResultados.style.display = 'block';
+    } else {
+        sinResultados.style.display = 'none';
+    }
+}
+        </script>
+
+        <!-- CDN de emoji-picker-element -->
+        <script type="module">
+            import 'https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js';
+
+            const emojiButton = document.getElementById('emojiButton');
+            const emojiPicker = document.getElementById('emojiPicker');
+            const inputMensaje = document.querySelector('.form-control.border-0.bg-transparent'); // Tu input
+
+            // Toggle del picker
+            emojiButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (emojiPicker.style.display === 'none') {
+                    emojiPicker.style.display = 'block';
+                    
+                    // Obtener posición del botón (siempre actualizada)
+                    const rect = emojiButton.getBoundingClientRect();
+                    const pickerHeight = 435; // Altura aproximada del picker
+                    
+                    // Posicionar arriba del botón con position fixed
+                    emojiPicker.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
+                    emojiPicker.style.left = rect.left + 'px';
+                    emojiPicker.style.top = 'auto';
+                    emojiPicker.style.right = 'auto';
+                } else {
+                    emojiPicker.style.display = 'none';
+                }
+            });
+
+            // Actualizar posición si hay scroll (opcional, para que se mantenga pegado al botón)
+            let isPickerOpen = false;
+            window.addEventListener('scroll', () => {
+                if (emojiPicker.style.display !== 'none') {
+                    const rect = emojiButton.getBoundingClientRect();
+                    emojiPicker.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
+                    emojiPicker.style.left = rect.left + 'px';
+                }
+            }, true);
+
+            // Insertar emoji en el input
+            emojiPicker.addEventListener('emoji-click', (event) => {
+                const emoji = event.detail.unicode;
+                
+                if (inputMensaje) {
+                    // Insertar en la posición del cursor
+                    const start = inputMensaje.selectionStart || 0;
+                    const end = inputMensaje.selectionEnd || 0;
+                    const text = inputMensaje.value;
+                    
+                    inputMensaje.value = text.substring(0, start) + emoji + text.substring(end);
+                    
+                    // Enfocar el input
+                    inputMensaje.focus();
+                    
+                    // Mover cursor después del emoji
+                    const newPos = start + emoji.length;
+                    inputMensaje.setSelectionRange(newPos, newPos);
+                }
+                
+                // Cerrar picker
+                emojiPicker.style.display = 'none';
+            });
+
+            // Cerrar al hacer click fuera
+            document.addEventListener('click', (e) => {
+                if (!emojiPicker.contains(e.target) && !emojiButton.contains(e.target)) {
+                    emojiPicker.style.display = 'none';
+                }
+            });
+
+            // Cerrar con la tecla ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && emojiPicker.style.display !== 'none') {
+                    emojiPicker.style.display = 'none';
+                }
+            });
+            
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+
+        <!-- Cargar SDK de Facebook -->
+        <script src="{% static 'mass_sender/funciones.js' %}"></script>
+        <script src="{% static 'mass_sender/funciones_responsive.js' %}"></script>
+        <script src="{% static 'mass_sender/funciones_oportunidades.js' %}"></script>
+        <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        
+    </body>
+
+</html>

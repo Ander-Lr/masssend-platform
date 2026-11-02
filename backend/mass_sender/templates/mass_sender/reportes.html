@@ -1,0 +1,281 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Reportes — {{ site_title }}{% endblock %}
+
+{% block extrahead %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+    .rep-container { max-width: 1200px; }
+
+    .rep-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 22px 26px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+        margin-bottom: 20px;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+    .stat-box {
+        background: #fff;
+        border-radius: 12px;
+        padding: 18px 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+        display: flex; align-items: center; gap: 14px;
+    }
+    .stat-icon-wrap {
+        width: 46px; height: 46px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; flex-shrink: 0;
+    }
+    .stat-val  { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+    .stat-lbl  { font-size: 0.78rem; color: #888; font-weight: 500; margin-top: 3px; }
+    .stat-pct  { font-size: 0.72rem; font-weight: 700; margin-top: 4px; }
+
+    .prog-wrap { height: 5px; background: #f0f0f0; border-radius: 4px; margin-top: 6px; }
+    .prog-fill  { height: 100%; border-radius: 4px; }
+
+    .tbl { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    .tbl th { background: #f5f3ff; color: #6b21a8; padding: 9px 12px; text-align: left; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tbl td { padding: 8px 12px; border-bottom: 1px solid #f5f0ff; vertical-align: middle; }
+    .tbl tr:hover td { background: #faf5ff; }
+
+    .bst { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+    .bst-sent      { background: #e0e7ff; color: #3730a3; }
+    .bst-delivered { background: #d1fae5; color: #065f46; }
+    .bst-read      { background: #e0f9ff; color: #0369a1; }
+    .bst-failed    { background: #fee2e2; color: #991b1b; }
+    .bst-pending   { background: #fef3c7; color: #92400e; }
+
+    .section-lbl { font-size: 0.82rem; font-weight: 700; color: #6b21a8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+
+    .filter-bar {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: #fff; border-radius: 10px; padding: 12px 18px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+    }
+    .filter-bar label { font-size: 0.82rem; font-weight: 600; color: #555; }
+    .filter-bar input, .filter-bar select {
+        padding: 6px 10px; border: 1px solid #ddd; border-radius: 7px;
+        font-size: 0.83rem;
+    }
+    .btn-rep {
+        background: #7c3aed; color: #fff; border: none;
+        padding: 7px 18px; border-radius: 8px; font-size: 0.83rem;
+        font-weight: 700; cursor: pointer;
+    }
+    .btn-rep:hover { background: #6d28d9; }
+</style>
+
+<div class="rep-container">
+    <h1 style="font-size:1.3rem; font-weight:800; margin-bottom:20px;">
+        Reportes de Mensajería
+    </h1>
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+        <label>Desde:</label>
+        <input type="date" id="fDesde">
+        <label>Hasta:</label>
+        <input type="date" id="fHasta">
+        <label>Estado:</label>
+        <select id="fStatus">
+            <option value="">Todos</option>
+            <option value="sent">Enviado</option>
+            <option value="delivered">Entregado</option>
+            <option value="read">Leído</option>
+            <option value="failed">Fallido</option>
+        </select>
+        <button class="btn-rep" onclick="cargarDatos()">Actualizar</button>
+        <span id="lastUpdate" style="font-size:0.75rem; color:#888; margin-left:auto;"></span>
+    </div>
+
+    <!-- Tarjetas -->
+    <div class="stat-grid" id="statGrid">
+        <div class="stat-box">
+            <div class="stat-icon-wrap" style="background:#ede9fe;"><span>📤</span></div>
+            <div>
+                <div class="stat-val" id="vEnviados">—</div>
+                <div class="stat-lbl">Mensajes enviados</div>
+                <div class="stat-pct" id="vRecibidos" style="color:#888;"></div>
+            </div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon-wrap" style="background:#d1fae5;"><span>✓✓</span></div>
+            <div>
+                <div class="stat-val" id="vEntregados">—</div>
+                <div class="stat-lbl">Entregados</div>
+                <div class="prog-wrap"><div class="prog-fill" id="pgEntregados" style="background:#10b981; width:0%;"></div></div>
+                <div class="stat-pct" id="pctEntregados" style="color:#10b981;"></div>
+            </div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon-wrap" style="background:#e0f9ff;"><span>👁</span></div>
+            <div>
+                <div class="stat-val" id="vLeidos">—</div>
+                <div class="stat-lbl">Leídos</div>
+                <div class="prog-wrap"><div class="prog-fill" id="pgLeidos" style="background:#0ea5e9; width:0%;"></div></div>
+                <div class="stat-pct" id="pctLeidos" style="color:#0ea5e9;"></div>
+            </div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon-wrap" style="background:#fee2e2;"><span>✗</span></div>
+            <div>
+                <div class="stat-val" id="vFallidos">—</div>
+                <div class="stat-lbl">Fallidos</div>
+                <div class="stat-pct" id="pctFallidos" style="color:#ef4444;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficas -->
+    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px; margin-bottom:20px;">
+        <div class="rep-card">
+            <div class="section-lbl">Actividad diaria</div>
+            <canvas id="chartLineas" height="80"></canvas>
+        </div>
+        <div class="rep-card">
+            <div class="section-lbl">Estados</div>
+            <canvas id="chartDona" height="160"></canvas>
+            <div id="leyDona" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; justify-content:center;"></div>
+        </div>
+    </div>
+
+    <!-- Tabla de mensajes -->
+    <div class="rep-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div class="section-lbl" style="margin-bottom:0;">Mensajes enviados recientes</div>
+            <input type="text" id="busqTabla" placeholder="🔍 Buscar..." oninput="filtrarTabla()"
+                style="padding:6px 12px; border:1px solid #ddd; border-radius:8px; font-size:0.82rem; width:200px;">
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="tbl">
+                <thead><tr>
+                    <th>Teléfono</th>
+                    <th>Campaña</th>
+                    <th>Mensaje</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr></thead>
+                <tbody id="tblBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let cLineas = null, cDona = null;
+let cacheMsgs = [];
+
+// Inicializar fechas
+(function() {
+    const hoy = new Date(), h30 = new Date();
+    h30.setDate(hoy.getDate() - 30);
+    document.getElementById('fDesde').value = h30.toISOString().split('T')[0];
+    document.getElementById('fHasta').value = hoy.toISOString().split('T')[0];
+    cargarDatos();
+})();
+
+function cargarDatos() {
+    const desde  = document.getElementById('fDesde').value;
+    const hasta  = document.getElementById('fHasta').value;
+    const status = document.getElementById('fStatus').value;
+
+    fetch(`/whatsapp/api/reportes/?desde=${desde}&hasta=${hasta}&status=${status}`)
+        .then(r => r.json())
+        .then(d => {
+            renderStats(d.resumen);
+            renderLineas(d.por_dia);
+            renderDona(d.resumen);
+            cacheMsgs = d.mensajes;
+            filtrarTabla();
+            document.getElementById('lastUpdate').textContent = 'Actualizado: ' + new Date().toLocaleTimeString();
+        })
+        .catch(e => console.error('Error cargando reportes:', e));
+}
+
+function renderStats(r) {
+    document.getElementById('vEnviados').textContent   = (r.enviados   || 0).toLocaleString();
+    document.getElementById('vEntregados').textContent = (r.entregados || 0).toLocaleString();
+    document.getElementById('vLeidos').textContent     = (r.leidos     || 0).toLocaleString();
+    document.getElementById('vFallidos').textContent   = (r.fallidos   || 0).toLocaleString();
+    document.getElementById('vRecibidos').textContent  = (r.recibidos  || 0) + ' recibidos';
+
+    const env = r.enviados || 1;
+    const pEnt = Math.round((r.entregados + r.leidos) / env * 100);
+    const pLec = Math.round(r.leidos / env * 100);
+    const pFal = Math.round(r.fallidos / env * 100);
+
+    document.getElementById('pgEntregados').style.width = pEnt + '%';
+    document.getElementById('pgLeidos').style.width     = pLec + '%';
+    document.getElementById('pctEntregados').textContent = pEnt + '% tasa entrega';
+    document.getElementById('pctLeidos').textContent     = pLec + '% tasa lectura';
+    document.getElementById('pctFallidos').textContent   = pFal + '% de error';
+}
+
+function renderLineas(porDia) {
+    const labels = porDia.map(d => { const p = d.dia.split('-'); return p[2]+'/'+p[1]; });
+    if (cLineas) cLineas.destroy();
+    cLineas = new Chart(document.getElementById('chartLineas'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label:'Enviados', data: porDia.map(d => d.enviados), borderColor:'#7c3aed', backgroundColor:'rgba(124,58,237,0.08)', borderWidth:2.5, tension:0.4, fill:true, pointRadius:3 },
+                { label:'Recibidos', data: porDia.map(d => d.recibidos), borderColor:'#0ea5e9', backgroundColor:'rgba(14,165,233,0.06)', borderWidth:2, tension:0.4, fill:true, pointRadius:3 }
+            ]
+        },
+        options: { responsive:true, plugins:{legend:{position:'top'}}, scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:'#f5f0ff'}} } }
+    });
+}
+
+function renderDona(r) {
+    if (cDona) cDona.destroy();
+    const datos   = [r.leidos, r.entregados, r.enviados_puro, r.fallidos];
+    const labels  = ['Leídos','Entregados','Solo enviados','Fallidos'];
+    const colores = ['#0ea5e9','#10b981','#8696a0','#ef4444'];
+    cDona = new Chart(document.getElementById('chartDona'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: datos, backgroundColor: colores, borderWidth:2, borderColor:'#fff' }] },
+        options: { responsive:true, cutout:'62%', plugins:{ legend:{display:false} } }
+    });
+    document.getElementById('leyDona').innerHTML = labels.map((l,i) =>
+        `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.74rem;color:#555;">
+            <span style="width:9px;height:9px;border-radius:50%;background:${colores[i]};display:inline-block;"></span>
+            ${l}: <strong>${datos[i]}</strong></span>`
+    ).join('');
+}
+
+function filtrarTabla() {
+    const t = (document.getElementById('busqTabla').value || '').toLowerCase();
+    const filtrados = cacheMsgs.filter(m =>
+        !t || (m.telefono||'').includes(t) || (m.mensaje||'').toLowerCase().includes(t) || (m.campana||'').toLowerCase().includes(t)
+    );
+    const eBadge = { sent:'bst-sent', delivered:'bst-delivered', read:'bst-read', failed:'bst-failed', pending:'bst-pending' };
+    const eLbl   = { sent:'Enviado', delivered:'Entregado', read:'Leído', failed:'Fallido', pending:'Pendiente' };
+    const eTick  = { sent:'✓', delivered:'✓✓', read:'✓✓', failed:'✗', pending:'⏳' };
+    const eColor = { read:'color:#0ea5e9' };
+
+    document.getElementById('tblBody').innerHTML = filtrados.length === 0
+        ? '<tr><td colspan="5" style="text-align:center;color:#888;padding:24px;">Sin resultados</td></tr>'
+        : filtrados.map(m => `<tr>
+            <td style="font-family:monospace;">${esc(m.telefono)}</td>
+            <td>${m.campana ? `<span style="background:#ede9fe;color:#6b21a8;padding:2px 8px;border-radius:6px;font-size:0.74rem;">${esc(m.campana)}</span>` : '<span style="color:#ccc;">—</span>'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(m.mensaje)}">${esc(m.mensaje)}</td>
+            <td><span class="bst ${eBadge[m.status]||'bst-pending'}"><span ${eColor[m.status]?'style="'+eColor[m.status]+'"':''}>${eTick[m.status]||'?'}</span> ${eLbl[m.status]||m.status}</span></td>
+            <td style="color:#888;font-size:0.78rem;white-space:nowrap;">${esc(m.fecha)}</td>
+        </tr>`).join('');
+}
+
+function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

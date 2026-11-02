@@ -1,0 +1,704 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Cambiar Número de WhatsApp{% endblock %}
+
+{% block content %}
+<style>
+    .cn-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+    .cn-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .cn-status-online  { background: #d1fae5; color: #065f46; }
+    .cn-status-offline { background: #fee2e2; color: #991b1b; }
+    .cn-dot {
+        width: 9px; height: 9px;
+        border-radius: 50%;
+        animation: pulse-dot 1.5s infinite;
+    }
+    .cn-dot-green { background: #10b981; }
+    .cn-dot-red   { background: #ef4444; animation: none; }
+    @keyframes pulse-dot {
+        0%,100% { opacity: 1; transform: scale(1); }
+        50%      { opacity: 0.5; transform: scale(1.4); }
+    }
+
+    #qrBox {
+        background: #f9fafb;
+        border: 2px dashed #d1d5db;
+        border-radius: 16px;
+        min-height: 260px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 24px;
+        transition: border-color 0.3s;
+        width: 100%;
+    }
+    #qrBox.has-qr { border-color: #7c3aed; background: #faf5ff; }
+    #qrBox canvas { border-radius: 8px; }
+
+    .cn-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .cn-step-num {
+        min-width: 26px; height: 26px;
+        background: #7c3aed; color: #fff;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 700;
+        flex-shrink: 0;
+    }
+    .cn-step-text { font-size: 0.85rem; color: #374151; padding-top: 3px; }
+
+    #btnDesconectar {
+        background: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 24px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 0.9rem;
+        width: 100%;
+    }
+    #btnDesconectar:hover    { background: #b91c1c; }
+    #btnDesconectar:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    #msgEstado {
+        font-size: 0.82rem;
+        margin-top: 8px;
+        min-height: 20px;
+        text-align: center;
+    }
+    .msg-ok  { color: #065f46; }
+    .msg-err { color: #991b1b; }
+
+    /* ── Loader inicial: esperando QR ───────────────────────────── */
+    .spinner-qr {
+        width: 40px; height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #7c3aed;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Loader de conexion activa ───────────────────────────────── */
+    .wha-connecting-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        padding: 18px 10px 6px;
+        width: 100%;
+    }
+
+    .wha-rings {
+        position: relative;
+        width: 68px;
+        height: 68px;
+        flex-shrink: 0;
+    }
+    .wha-ring {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(37, 211, 102, 0.18);
+        animation: wha-expand 2.1s ease-out infinite;
+    }
+    .wha-ring:nth-child(1) { inset: -10px; animation-delay: 0s;    }
+    .wha-ring:nth-child(2) { inset: -22px; animation-delay: 0.55s; }
+    .wha-ring:nth-child(3) { inset: -34px; animation-delay: 1.1s;  }
+    @keyframes wha-expand {
+        0%   { opacity: .75; transform: scale(.85); }
+        100% { opacity: 0;   transform: scale(1.2); }
+    }
+    .wha-center-icon {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: #25d366;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+        box-shadow: 0 4px 18px rgba(37,211,102,.4);
+    }
+
+    .wha-connecting-text {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    .wha-connecting-title {
+        font-size: .93rem;
+        font-weight: 700;
+        color: #374151;
+        margin: 0;
+        letter-spacing: -.01em;
+    }
+    .wha-connecting-sub {
+        font-size: .78rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    .wha-dots {
+        display: inline-flex;
+        gap: 5px;
+        align-items: flex-end;
+        height: 14px;
+    }
+    .wha-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: #25d366;
+        animation: wha-bounce 1.3s ease-in-out infinite;
+    }
+    .wha-dot:nth-child(1) { animation-delay: 0s;    }
+    .wha-dot:nth-child(2) { animation-delay: .18s;  }
+    .wha-dot:nth-child(3) { animation-delay: .36s;  }
+    @keyframes wha-bounce {
+        0%, 70%, 100% { transform: translateY(0);    opacity: 1;   }
+        35%            { transform: translateY(-7px); opacity: .85; }
+    }
+
+    .cn-connected-icon {
+        width: 48px; height: 48px;
+        border-radius: 50%;
+        background: #d1fae5;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    .cn-success-box {
+        background: #d1fae5;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        display: none;
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    /* Tabs */
+    .cn-tabs {
+        display: flex;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 16px;
+        width: 100%;
+    }
+    .cn-tab {
+        flex: 1;
+        padding: 9px 0;
+        text-align: center;
+        font-size: 0.83rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #f9fafb;
+        color: #6b7280;
+        border: none;
+        transition: background 0.15s, color 0.15s;
+    }
+    .cn-tab.active { background: #7c3aed; color: #fff; }
+    .cn-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Código de vinculación */
+    .pairing-code-display {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+    }
+    .pairing-digit-group {
+        background: #fff;
+        border: 2px solid #7c3aed;
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 4px;
+        color: #1e1b4b;
+        font-family: monospace;
+        min-width: 72px;
+        text-align: center;
+    }
+    .pairing-dash { font-size: 1.4rem; color: #7c3aed; font-weight: 700; }
+
+    .phone-input-group {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+        margin-top: 8px;
+    }
+    .phone-input-group input {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1.5px solid #d1d5db;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .phone-input-group input:focus { border-color: #7c3aed; }
+    .phone-input-group button {
+        padding: 10px 18px;
+        background: #7c3aed;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+    .phone-input-group button:hover    { background: #6d28d9; }
+    .phone-input-group button:disabled { background: #9ca3af; cursor: not-allowed; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<div class="py-4">
+    <h2 class="mb-1 fw-bold" style="font-size:1.4rem;">Cambiar Número de WhatsApp</h2>
+    <p class="text-muted mb-4" style="font-size:0.9rem;">
+        Desconecta el número actual y vincula otro con código QR o con código de teléfono.
+    </p>
+
+    <div class="row g-4">
+
+        <!-- Columna izquierda -->
+        <div class="col-12 col-md-6">
+            <div class="cn-card h-100">
+
+                <div class="mb-4">
+                    <small class="text-muted d-block mb-2" style="font-size:0.78rem; text-transform:uppercase; letter-spacing:.05em;">Estado actual de la conexión</small>
+                    <div id="estadoBadge"
+                         class="cn-status-badge {% if wa_connected %}cn-status-online{% else %}cn-status-offline{% endif %}">
+                        <span class="cn-dot {% if wa_connected %}cn-dot-green{% else %}cn-dot-red{% endif %}" id="estadoDot"></span>
+                        <span id="estadoTexto">{% if wa_connected %}Conectado{% else %}Desconectado{% endif %}</span>
+                    </div>
+                </div>
+
+                <div class="mb-4 p-3 rounded" style="background:#f3f4f6;">
+                    <small class="text-muted d-block mb-1" style="font-size:0.78rem;">Número actualmente conectado</small>
+                    <strong style="font-size:1.05rem;" id="numeroActual">{{ numero_actual }}</strong>
+                </div>
+
+                <div class="mb-4">
+                    <p class="fw-semibold mb-3" style="font-size:0.85rem;">Cómo cambiar el número</p>
+                    <div class="cn-step">
+                        <div class="cn-step-num">1</div>
+                        <div class="cn-step-text">Haz clic en <strong>Desconectar número</strong>.</div>
+                    </div>
+                    <div class="cn-step">
+                        <div class="cn-step-num">2</div>
+                        <div class="cn-step-text">Elige si prefieres el <strong>código QR</strong> o vincular con tu <strong>número de teléfono</strong>.</div>
+                    </div>
+                    <div class="cn-step">
+                        <div class="cn-step-num">3</div>
+                        <div class="cn-step-text">Abre WhatsApp → <strong>Dispositivos vinculados</strong> → sigue el método elegido.</div>
+                    </div>
+                    <div class="cn-step">
+                        <div class="cn-step-num">4</div>
+                        <div class="cn-step-text">Cuando el estado cambie a <strong>Conectado</strong>, el nuevo número ya está activo.</div>
+                    </div>
+                </div>
+
+                <div class="p-3 mb-4 rounded" style="background:#fef3c7; border-left:4px solid #f59e0b; font-size:0.8rem;">
+                    El historial de chats y contactos <strong>no se borra</strong>. Solo cambia el número conectado.
+                </div>
+
+                <button id="btnDesconectar" onclick="desconectarNumero()">
+                    Desconectar número actual
+                </button>
+                <div id="msgEstado"></div>
+
+            </div>
+        </div>
+
+        <!-- Columna derecha -->
+        <div class="col-12 col-md-6">
+            <div class="cn-card h-100 d-flex flex-column align-items-center">
+
+                <!-- Tabs -->
+                <div class="cn-tabs">
+                    <button class="cn-tab active" id="tabQR"    onclick="setTab('qr')">Código QR</button>
+                    <button class="cn-tab"         id="tabPhone" onclick="setTab('phone')">Código por teléfono</button>
+                </div>
+
+                <!-- Panel QR -->
+                <div id="panelQR" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+                    <p class="fw-semibold mb-3" style="font-size:0.9rem;">Código QR para escanear</p>
+                    <div id="qrBox">
+                        {% if wa_connected %}
+                            <div class="cn-connected-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" viewBox="0 0 24 24">
+                                    <path d="M5 13l4 4L19 7" stroke="#065f46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <p style="font-size:0.85rem; color:#374151; text-align:center; margin:0;">
+                                Numero conectado. Desconectalo primero para ver el nuevo QR.
+                            </p>
+                        {% else %}
+                            <div class="spinner-qr" id="qrSpinner"></div>
+                            <p style="font-size:0.82rem; color:#6b7280; margin:0;" id="qrWaitText">
+                                Esperando código QR de WhatsApp...
+                            </p>
+                        {% endif %}
+                        <div id="qrCanvas"></div>
+                    </div>
+                    <p class="text-muted mt-3" style="font-size:0.75rem; text-align:center;">
+                        El código QR se actualiza automáticamente cada 3 segundos.
+                    </p>
+                </div>
+
+                <!-- Panel Teléfono -->
+                <div id="panelPhone" style="width:100%; display:none; flex-direction:column; align-items:center;">
+                    <p class="fw-semibold mb-2" style="font-size:0.9rem;">Vincular con número de teléfono</p>
+                    <p style="font-size:0.8rem; color:#6b7280; text-align:center; margin-bottom:16px;">
+                        Ingresa el número que quieres vincular con código de país, sin el signo +.<br>
+                        Luego abre WhatsApp → Dispositivos vinculados → Ingresar código.
+                    </p>
+
+                    <div class="phone-input-group">
+                        <input type="tel" id="inputTelefono"
+                               placeholder="5930000000000"
+                               value="593"
+                               oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+                               maxlength="15"/>
+                        <button id="btnPedirCodigo" onclick="pedirCodigo()">Obtener código</button>
+                    </div>
+
+                    <div id="pairingBox" style="margin-top:24px; width:100%; display:none; flex-direction:column; align-items:center; gap:12px;">
+                        <p style="font-size:0.8rem; color:#374151; text-align:center; margin:0;">
+                            Ingresa este código en WhatsApp (válido por ~60 segundos):
+                        </p>
+                        <div class="pairing-code-display">
+                            <div class="pairing-digit-group" id="pairingPart1">----</div>
+                            <span class="pairing-dash">-</span>
+                            <div class="pairing-digit-group" id="pairingPart2">----</div>
+                        </div>
+                    </div>
+
+                    <div id="pairingMsg" style="font-size:0.82rem; margin-top:12px; text-align:center; min-height:20px;"></div>
+                </div>
+
+                <div class="cn-success-box" id="successBox">
+                    <p class="fw-bold mb-1" style="color:#065f46;">Conectado exitosamente</p>
+                    <p style="font-size:0.82rem; color:#374151; margin:0;">El nuevo número ya está activo y listo para enviar mensajes.</p>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let pollingInterval = null;
+let qrInstance      = null;
+let lastQRString    = null;
+let desconectando   = false;
+let qrWasShown      = false;   /* rastrea si el QR ya fue mostrado al menos una vez */
+
+// ── Tabs ──────────────────────────────────────────────────────────────
+function setTab(tab) {
+    document.getElementById('tabQR').classList.toggle('active', tab === 'qr');
+    document.getElementById('tabPhone').classList.toggle('active', tab === 'phone');
+    document.getElementById('panelQR').style.display    = tab === 'qr'    ? 'flex' : 'none';
+    document.getElementById('panelPhone').style.display = tab === 'phone' ? 'flex' : 'none';
+}
+
+// ── Polling ───────────────────────────────────────────────────────────
+function iniciarPolling() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(actualizarEstado, 3000);
+    actualizarEstado();
+}
+
+async function actualizarEstado() {
+    try {
+        const resp = await fetch('/whatsapp/api/qr-status/');
+        const data = await resp.json();
+
+        const badge   = document.getElementById('estadoBadge');
+        const dot     = document.getElementById('estadoDot');
+        const texto   = document.getElementById('estadoTexto');
+        const success = document.getElementById('successBox');
+        const btn     = document.getElementById('btnDesconectar');
+
+        if (data.ready) {
+            badge.className   = 'cn-status-badge cn-status-online';
+            dot.className     = 'cn-dot cn-dot-green';
+            texto.textContent = 'Conectado';
+            btn.disabled      = false;
+            btn.textContent   = 'Desconectar número actual';
+            mostrarConectadoEnQR();
+            if (desconectando) {
+                desconectando = false;
+                success.style.display = 'block';
+                clearInterval(pollingInterval);
+            }
+            lastQRString = null;
+
+        } else if (data.has_pairing && data.pairing_code) {
+            badge.className   = 'cn-status-badge cn-status-offline';
+            dot.className     = 'cn-dot cn-dot-red';
+            texto.textContent = 'Esperando vinculación...';
+            mostrarCodigoPairing(data.pairing_code, data.pairing_phone);
+
+        } else if (data.has_qr && data.qr) {
+            badge.className   = 'cn-status-badge cn-status-offline';
+            dot.className     = 'cn-dot cn-dot-red';
+            texto.textContent = 'Esperando escaneo...';
+            if (data.qr !== lastQRString) {
+                lastQRString = data.qr;
+                mostrarQR(data.qr);
+            }
+
+        } else {
+            badge.className   = 'cn-status-badge cn-status-offline';
+            dot.className     = 'cn-dot cn-dot-red';
+
+            if (qrWasShown) {
+                /* QR ya se mostró pero desapareció sin estar listo → conectando */
+                texto.textContent = 'Conectando...';
+                mostrarConectando();
+            } else {
+                texto.textContent = 'Desconectado';
+                mostrarEsperandoQR();
+            }
+        }
+    } catch (e) {
+        console.error('Error polling:', e);
+    }
+}
+
+// ── Helpers de UI ─────────────────────────────────────────────────────
+function mostrarEsperandoQR() {
+    const spinner = document.getElementById('qrSpinner');
+    const waitTxt = document.getElementById('qrWaitText');
+    if (spinner) spinner.style.display = 'block';
+    if (waitTxt) waitTxt.style.display = 'block';
+}
+
+function mostrarConectando() {
+    const qrBox = document.getElementById('qrBox');
+    if (qrBox && qrBox.dataset.state === 'connecting') return; /* ya mostrado */
+    if (!qrBox) return;
+    qrBox.dataset.state = 'connecting';
+    qrBox.className = 'has-qr';
+    qrBox.innerHTML = `
+        <div class="wha-connecting-wrap">
+            <div class="wha-rings">
+                <div class="wha-ring"></div>
+                <div class="wha-ring"></div>
+                <div class="wha-ring"></div>
+                <div class="wha-center-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                        <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.07L2 22l4.93-1.38C8.42 21.5 10.15 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.57 0-3.04-.43-4.31-1.18l-.31-.18-3.17.96.96-3.17-.18-.31A8 8 0 0 1 4 12a8 8 0 0 1 16 0 8 8 0 0 1-8 8zm4.44-5.82c-.24-.12-1.43-.7-1.65-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.93-1.18-.71-.64-1.19-1.42-1.33-1.66-.14-.24-.01-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.19-.46-.39-.4-.54-.4h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.59 4.12 3.63.58.25 1.03.4 1.38.51.58.18 1.11.16 1.53.1.47-.07 1.43-.58 1.63-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="wha-connecting-text">
+                <p class="wha-connecting-title">Conectando con WhatsApp</p>
+                <div class="wha-dots">
+                    <div class="wha-dot"></div>
+                    <div class="wha-dot"></div>
+                    <div class="wha-dot"></div>
+                </div>
+                <p class="wha-connecting-sub">Verificando la sesión, un momento...</p>
+            </div>
+        </div>
+        <div id="qrCanvas"></div>`;
+    qrInstance = null;
+}
+
+function mostrarConectadoEnQR() {
+    qrWasShown = false;
+    const qrBox = document.getElementById('qrBox');
+    qrBox.className = '';
+    delete qrBox.dataset.state;
+    qrBox.innerHTML = `
+        <div class="cn-connected-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="none" viewBox="0 0 24 24">
+                <path d="M5 13l4 4L19 7" stroke="#065f46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <p style="font-size:0.85rem;color:#374151;text-align:center;margin:0;">Número conectado correctamente.</p>
+        <div id="qrCanvas"></div>`;
+    qrInstance = null;
+    lastQRString = null;
+}
+
+function mostrarQR(qrString) {
+    const qrBox   = document.getElementById('qrBox');
+    const spinner = document.getElementById('qrSpinner');
+    const waitTxt = document.getElementById('qrWaitText');
+
+    qrWasShown = true;
+    qrBox.dataset.state = 'qr';
+    qrBox.classList.add('has-qr');
+    if (spinner) spinner.style.display = 'none';
+    if (waitTxt) waitTxt.style.display = 'none';
+
+    let canvas = document.getElementById('qrCanvas');
+    if (!canvas) {
+        canvas = document.createElement('div');
+        canvas.id = 'qrCanvas';
+        qrBox.appendChild(canvas);
+    }
+    canvas.innerHTML = '';
+    qrInstance = new QRCode(canvas, {
+        text: qrString, width: 220, height: 220,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+    });
+}
+
+function mostrarCodigoPairing(code, phone) {
+    setTab('phone');
+    const pbox = document.getElementById('pairingBox');
+    pbox.style.display = 'flex';
+    const clean = code.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    document.getElementById('pairingPart1').textContent = clean.slice(0, 4) || '----';
+    document.getElementById('pairingPart2').textContent = clean.slice(4, 8) || '----';
+    const pmsg = document.getElementById('pairingMsg');
+    pmsg.className   = 'msg-ok';
+    pmsg.textContent = phone ? 'Código listo para el número ' + phone : 'Ingresa este código en WhatsApp';
+}
+
+// ── Desconectar ───────────────────────────────────────────────────────
+async function desconectarNumero() {
+    const btn     = document.getElementById('btnDesconectar');
+    const msg     = document.getElementById('msgEstado');
+    const success = document.getElementById('successBox');
+
+    btn.disabled    = true;
+    btn.textContent = 'Desconectando...';
+    msg.textContent = '';
+    msg.className   = '';
+    success.style.display = 'none';
+    desconectando   = true;
+
+    // Resetear QR
+    lastQRString = null;
+    qrInstance   = null;
+    qrWasShown   = false;
+    const qrBox  = document.getElementById('qrBox');
+    qrBox.className = '';
+    delete qrBox.dataset.state;
+    qrBox.innerHTML = '<div class="spinner-qr"></div><p style="font-size:0.82rem;color:#6b7280;margin:0;">Esperando QR de WhatsApp...</p><div id="qrCanvas"></div>';
+
+    try {
+        const resp = await fetch('/whatsapp/api/cambiar-numero/', {
+            method:  'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+
+        let data = {};
+        try { data = await resp.json(); } catch (_) {}
+
+        if (resp.ok && data.success !== false) {
+            msg.className   = 'msg-ok';
+            msg.textContent = 'Desconectado. Esperando nuevo código QR en unos segundos...';
+            btn.textContent = 'Desconectar numero actual';
+            btn.disabled    = false;
+            // Esperar un poco antes de iniciar el polling para dar tiempo al reinicio
+            setTimeout(iniciarPolling, 4000);
+        } else {
+            throw new Error(data.error || 'HTTP ' + resp.status);
+        }
+    } catch (e) {
+        msg.className   = 'msg-err';
+        msg.textContent = 'Error: ' + e.message;
+        btn.disabled    = false;
+        btn.textContent = 'Desconectar numero actual';
+        desconectando   = false;
+    }
+}
+
+// ── Código por teléfono ───────────────────────────────────────────────
+async function pedirCodigo() {
+    const input = document.getElementById('inputTelefono');
+    const btnPC = document.getElementById('btnPedirCodigo');
+    const pmsg  = document.getElementById('pairingMsg');
+    const pbox  = document.getElementById('pairingBox');
+
+    const phone = input.value.trim();
+    if (!phone || phone.length < 7) {
+        pmsg.className   = 'msg-err';
+        pmsg.textContent = 'Ingresa un número válido con código de país, sin el + (ej: 5491150000000)';
+        return;
+    }
+
+    btnPC.disabled    = true;
+    btnPC.textContent = 'Solicitando...';
+    pmsg.textContent  = '';
+    pbox.style.display = 'none';
+
+    try {
+        const resp = await fetch('/whatsapp/api/request-pairing/', {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken':  getCookie('csrftoken')
+            },
+            body: JSON.stringify({ phone: phone })
+        });
+        const data = await resp.json();
+
+        if (data.success && data.code) {
+            mostrarCodigoPairing(data.code, phone);
+        } else if (data.success) {
+            pmsg.className   = 'msg-ok';
+            pmsg.textContent = 'Número guardado. El código aparecerá en unos segundos...';
+            iniciarPolling();
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+    } catch (e) {
+        pmsg.className   = 'msg-err';
+        pmsg.textContent = 'Error: ' + e.message;
+    } finally {
+        btnPC.disabled    = false;
+        btnPC.textContent = 'Obtener código';
+    }
+}
+
+// ── Cookie helper ─────────────────────────────────────────────────────
+function getCookie(name) {
+    let v = null;
+    document.cookie.split(';').forEach(c => {
+        c = c.trim();
+        if (c.startsWith(name + '=')) v = decodeURIComponent(c.slice(name.length + 1));
+    });
+    return v;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    iniciarPolling();
+});
+</script>
+{% endblock %}

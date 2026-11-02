@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Chat WhatsApp — {{ site_title }}{% endblock %}
+
+{% block content %}
+<style>
+    /* Quitar el padding del contenedor para que el iframe ocupe todo */
+    #content { padding: 0 !important; max-width: 100% !important; }
+    .chat-frame-wrap {
+        width: 100%;
+        height: calc(100vh - 64px);
+        overflow: hidden;
+    }
+    .chat-frame-wrap iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+    }
+</style>
+
+<div class="chat-frame-wrap">
+    <iframe
+        src="/whatsapp/chat/"
+        title="Chat WhatsApp"
+        allowfullscreen>
+    </iframe>
+</div>
+{% endblock %}

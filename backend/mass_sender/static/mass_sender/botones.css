@@ -1,0 +1,96 @@
+.template-menu-btn {
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 12px;
+        background-color: transparent;
+        color: var(--bs-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .template-menu-btn:hover {
+        background-color: rgba(var(--bs-primary-rgb), 0.08);
+        color: var(--bs-primary);
+    }
+
+    .template-menu-btn:active {
+        background-color: rgba(var(--bs-primary-rgb), 0.12);
+    }
+
+    /* Cuando el menú está activo/seleccionado */
+
+    .template-menu-btn {
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 12px;
+        background-color: transparent;
+        color: var(--bs-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .template-menu-btn:hover {
+        background-color: rgba(var(--bs-primary-rgb), 0.08);
+        color: var(--bs-primary);
+    }
+
+    .template-menu-btn:active {
+        background-color: rgba(var(--bs-primary-rgb), 0.12);
+    }
+
+    /* Cuando el menú está activo/seleccionado */
+    .template-menu-btn.active {
+        background-color: rgba(var(--bs-primary-rgb), 0.12);
+        color: var(--bs-primary);
+    }
+
+    .template-menu-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 24px;
+        height: 3px;
+        background-color: var(--bs-primary);
+        border-radius: 10px;
+        animation: expandLine 0.4s ease-out;
+    }
+
+    @keyframes expandLine {
+        0% {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+        }
+        50% {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+        }
+        100% {
+            width: 24px;
+            height: 3px;
+            border-radius: 10px;
+        }
+    }
+
+    .template-menu-btn svg {
+        transition: none;
+    }
+
+    .template-menu-btn svg {
+        transition: none;
+    }
+
+    

@@ -1,0 +1,439 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Monitor de Envio — {{ campaign_name }}{% endblock %}
+
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    .mon-wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .mon-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .mon-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #1e1b4b;
+        margin: 0 0 4px 0;
+    }
+
+    .mon-subtitle {
+        font-size: 0.82rem;
+        color: #888;
+    }
+
+    .badge-estado {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 14px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+    .badge-running   { background: #ede9fe; color: #6d28d9; }
+    .badge-scheduled { background: #fef3c7; color: #92400e; }
+    .badge-completed { background: #d1fae5; color: #065f46; }
+    .badge-cancelled { background: #fee2e2; color: #991b1b; }
+    .badge-draft     { background: #f3f4f6; color: #6b7280; }
+
+    /* Pulso animado para estado running */
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #7c3aed;
+        animation: pulse-anim 1.2s infinite;
+    }
+    @keyframes pulse-anim {
+        0%   { transform: scale(1);   opacity: 1; }
+        50%  { transform: scale(1.5); opacity: 0.5; }
+        100% { transform: scale(1);   opacity: 1; }
+    }
+
+    /* Tarjeta principal */
+    .mon-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 28px 30px;
+        box-shadow: 0 4px 20px rgba(109,40,217,0.08);
+        margin-bottom: 20px;
+        border: 1px solid #ede9fe;
+    }
+
+    /* Barra de progreso */
+    .prog-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .prog-label-text { font-size: 0.85rem; font-weight: 600; color: #555; }
+    .prog-pct { font-size: 1.5rem; font-weight: 800; color: #6d28d9; }
+
+    .prog-bar-bg {
+        height: 18px;
+        background: #f0ebff;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 8px;
+        position: relative;
+    }
+    .prog-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7c3aed, #a855f7);
+        transition: width 0.6s cubic-bezier(.4,0,.2,1);
+        position: relative;
+        overflow: hidden;
+    }
+    /* Efecto shimmer en la barra mientras corre */
+    .prog-bar-fill.running::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -60%;
+        width: 40%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+        animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+        0%   { left: -60%; }
+        100% { left: 120%; }
+    }
+    .prog-bar-fill.done {
+        background: linear-gradient(90deg, #059669, #10b981);
+    }
+
+    /* Contadores */
+    .counter-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 20px;
+    }
+    .counter-box {
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+    }
+    .counter-box.total    { background: #f5f3ff; }
+    .counter-box.sent-ok  { background: #f0fdf4; }
+    .counter-box.failed   { background: #fff1f2; }
+
+    .counter-num {
+        font-size: 2.2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+    .counter-box.total .counter-num   { color: #6d28d9; }
+    .counter-box.sent-ok .counter-num { color: #059669; }
+    .counter-box.failed .counter-num  { color: #e11d48; }
+
+    .counter-lbl {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    /* Tiempo estimado */
+    .mon-eta {
+        margin-top: 18px;
+        padding: 12px 16px;
+        background: #faf5ff;
+        border-radius: 10px;
+        border-left: 3px solid #7c3aed;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.84rem;
+        color: #5b21b6;
+    }
+    .mon-eta strong { font-weight: 700; font-size: 1rem; }
+
+    /* Mensaje de error */
+    .mon-error {
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: #856404;
+    }
+
+    /* Botones */
+    .mon-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    .btn-volver {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 20px;
+        border-radius: 9px;
+        background: #f5f3ff;
+        color: #6d28d9;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+        border: 1.5px solid #ddd6fe;
+        transition: background 0.15s;
+    }
+    .btn-volver:hover { background: #ede9fe; }
+
+    .btn-reportes {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 20px;
+        border-radius: 9px;
+        background: #7c3aed;
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+        border: none;
+        transition: background 0.15s;
+    }
+    .btn-reportes:hover { background: #6d28d9; }
+
+    /* Estado final (completado) */
+    .mon-done {
+        text-align: center;
+        padding: 24px;
+        display: none;
+    }
+    .mon-done-icon {
+        font-size: 3rem;
+        margin-bottom: 8px;
+    }
+    .mon-done-title {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #059669;
+        margin-bottom: 4px;
+    }
+    .mon-done-sub {
+        font-size: 0.85rem;
+        color: #888;
+    }
+</style>
+
+<div class="mon-wrap">
+
+    <!-- Encabezado -->
+    <div class="mon-header">
+        <div>
+            <p class="mon-title" id="monNombre">{{ campaign_name }}</p>
+            <p class="mon-subtitle">Monitor de envio en tiempo real</p>
+        </div>
+        <span class="badge-estado badge-running" id="badgeEstado">
+            <span class="pulse-dot" id="pulseDot"></span>
+            <span id="badgeText">Iniciando...</span>
+        </span>
+    </div>
+
+    <!-- Tarjeta de progreso principal -->
+    <div class="mon-card">
+        <div class="prog-label">
+            <span class="prog-label-text" id="progLabel">Preparando el envio...</span>
+            <span class="prog-pct" id="progPct">0%</span>
+        </div>
+
+        <div class="prog-bar-bg">
+            <div class="prog-bar-fill running" id="progBar" style="width: 0%;"></div>
+        </div>
+
+        <div style="font-size: 0.74rem; color: #aaa; text-align: right;" id="progDetalle">
+            0 de 0 mensajes procesados
+        </div>
+
+        <!-- Contadores -->
+        <div class="counter-grid">
+            <div class="counter-box total">
+                <div class="counter-num" id="cTotal">—</div>
+                <div class="counter-lbl">Total</div>
+            </div>
+            <div class="counter-box sent-ok">
+                <div class="counter-num" id="cEnviados">—</div>
+                <div class="counter-lbl">Enviados</div>
+            </div>
+            <div class="counter-box failed">
+                <div class="counter-num" id="cFallidos">—</div>
+                <div class="counter-lbl">Fallidos</div>
+            </div>
+        </div>
+
+        <!-- Tiempo estimado (solo visible mientras corre) -->
+        <div class="mon-eta" id="monEta">
+            <span>Tiempo estimado restante</span>
+            <strong id="etaValue">Calculando...</strong>
+        </div>
+
+        <!-- Ultima hora de error (si existe) -->
+        <div class="mon-error" id="monError" style="display:none;">
+            <strong>Ultimo error:</strong> <span id="errorText"></span>
+        </div>
+    </div>
+
+    <!-- Panel de exito al terminar -->
+    <div class="mon-card mon-done" id="monDone">
+        <div class="mon-done-icon">&#10003;</div>
+        <div class="mon-done-title">Campana completada</div>
+        <div class="mon-done-sub" id="doneResumen">—</div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="mon-actions">
+        <a href="/admin/mass_sender/campaign/" class="btn-volver">
+            Volver a Campanas
+        </a>
+        <a href="/admin/reportes/" class="btn-reportes">
+            Ver Reportes
+        </a>
+    </div>
+
+</div>
+
+<script>
+const CAMPAIGN_ID = {{ campaign_id }};
+const API_URL     = '/whatsapp/api/campaign-progress/' + CAMPAIGN_ID + '/';
+const DELAY_SEG   = 1.5; // segundos entre mensajes
+
+let pollTimer = null;
+let startTime = null;
+let lastSent  = 0;
+
+function formatTime(seconds) {
+    if (seconds < 60) return Math.ceil(seconds) + ' seg';
+    const m = Math.floor(seconds / 60);
+    const s = Math.ceil(seconds % 60);
+    return m + ' min ' + (s > 0 ? s + ' seg' : '');
+}
+
+function updateBadge(status, isRunning) {
+    const badge = document.getElementById('badgeEstado');
+    const text  = document.getElementById('badgeText');
+    const dot   = document.getElementById('pulseDot');
+
+    badge.className = 'badge-estado';
+    dot.style.display = 'none';
+
+    const labels = {
+        'running':   ['badge-running',   'Enviando...'],
+        'scheduled': ['badge-scheduled', 'Esperando hora programada'],
+        'completed': ['badge-completed', 'Completada'],
+        'cancelled': ['badge-cancelled', 'Cancelada'],
+        'draft':     ['badge-draft',     'Borrador'],
+    };
+    const [cls, lbl] = labels[status] || ['badge-draft', status];
+    badge.classList.add(cls);
+    text.textContent = lbl;
+
+    if (isRunning) {
+        dot.style.display = 'block';
+    }
+}
+
+function poll() {
+    fetch(API_URL)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+
+            const { total, sent, failed, percent, is_running, status, last_error, finished_at } = data;
+            const procesados = sent + failed;
+
+            // Calcular tiempo estimado
+            let etaText = '—';
+            if (is_running && total > 0 && procesados > 0) {
+                if (!startTime) startTime = Date.now();
+                const elapsed    = (Date.now() - startTime) / 1000;
+                const rate       = procesados / elapsed;          // mensajes por segundo
+                const restantes  = total - procesados;
+                const etaSeg     = rate > 0 ? restantes / rate : restantes * DELAY_SEG;
+                etaText = formatTime(etaSeg);
+            } else if (!is_running && status === 'completed') {
+                etaText = 'Finalizado';
+            } else if (status === 'scheduled') {
+                etaText = 'Esperando hora programada';
+            }
+
+            // Actualizar barra
+            const bar = document.getElementById('progBar');
+            bar.style.width = percent + '%';
+            if (!is_running || status === 'completed') {
+                bar.classList.remove('running');
+                bar.classList.add('done');
+            }
+
+            // Actualizar textos
+            document.getElementById('progPct').textContent      = percent + '%';
+            document.getElementById('progDetalle').textContent  = procesados + ' de ' + total + ' mensajes procesados';
+            document.getElementById('progLabel').textContent    = is_running ? 'Enviando mensajes...' : (status === 'completed' ? 'Envio completado' : 'En espera');
+            document.getElementById('cTotal').textContent       = total  || '—';
+            document.getElementById('cEnviados').textContent    = sent   || '0';
+            document.getElementById('cFallidos').textContent    = failed || '0';
+            document.getElementById('etaValue').textContent     = etaText;
+
+            // Badge de estado
+            updateBadge(status, is_running);
+
+            // Error
+            if (last_error) {
+                document.getElementById('monError').style.display = 'block';
+                document.getElementById('errorText').textContent  = last_error;
+            } else {
+                document.getElementById('monError').style.display = 'none';
+            }
+
+            // Si termino
+            if (!is_running && status === 'completed') {
+                document.getElementById('monEta').style.display = 'none';
+                const doneSec = document.getElementById('monDone');
+                doneSec.style.display = 'block';
+                document.getElementById('doneResumen').textContent =
+                    sent + ' mensajes enviados exitosamente' +
+                    (failed > 0 ? ', ' + failed + ' fallidos.' : '.');
+                clearInterval(pollTimer);
+            }
+
+            // Si esta en espera programada, poll menos frecuente
+            if (status === 'scheduled') {
+                clearInterval(pollTimer);
+                pollTimer = setInterval(poll, 15000); // cada 15 seg mientras espera
+            } else if (is_running) {
+                // Asegurarse de que el intervalo sea de 2 seg mientras corre
+                clearInterval(pollTimer);
+                pollTimer = setInterval(poll, 2000);
+            }
+        })
+        .catch(() => {
+            // Error de red, reintentar
+        });
+}
+
+// Iniciar polling cada 2 segundos
+pollTimer = setInterval(poll, 2000);
+poll(); // primera llamada inmediata
+</script>
+{% endblock %}
