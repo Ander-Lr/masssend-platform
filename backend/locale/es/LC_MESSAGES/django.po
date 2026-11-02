@@ -1,0 +1,51 @@
+# Traducciones personalizadas para MassSend
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: es\n"
+
+msgid "Type to search"
+msgstr "Buscar..."
+
+msgid "No results found"
+msgstr "Sin resultados"
+
+msgid "This page yielded into no results. Create a new item or reset your filters."
+msgstr "No hay registros. Crea uno nuevo o ajusta los filtros."
+
+msgid "Add"
+msgstr "Agregar"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Save and add another"
+msgstr "Guardar y agregar otro"
+
+msgid "Save and continue editing"
+msgstr "Guardar y continuar editando"
+
+msgid "Delete"
+msgstr "Eliminar"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Filter"
+msgstr "Filtrar"
+
+msgid "Clear all filters"
+msgstr "Limpiar filtros"
+
+msgid "Apply"
+msgstr "Aplicar"
+
+msgid "Select all"
+msgstr "Seleccionar todo"
+
+msgid "Action"
+msgstr "Acción"
+
+msgid "Go"
+msgstr "Ejecutar"

@@ -1,0 +1,19 @@
+Django~=4.2.0
+djangorestframework==3.16.1
+django-unfold==0.67.0
+python-dotenv==1.2.1
+whitenoise==6.9.0
+gunicorn==23.0.0
+dj-database-url==2.3.0
+psycopg2-binary==2.9.10
+asgiref==3.11.1
+sqlparse==0.5.5
+requests==2.32.3
+djangorestframework-simplejwt==5.3.1
+google-auth-oauthlib==1.2.1
+google-auth==2.29.0
+
+# ── Verificación de correo (Gmail) / MFA / recuperación ────────────
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+django-cors-headers==4.4.0
