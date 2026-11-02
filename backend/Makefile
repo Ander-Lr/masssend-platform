@@ -4,7 +4,7 @@ GATEWAY := masssend-gateway-tests
 INTEGRACION := docker compose -f tests/compose.yaml
 API_PORT ?= 8000
 CI := API_PORT=$(API_PORT) docker compose -p masssend-ci -f ../compose.yaml \
-	--env-file tests/ci.env --profile ci
+	--env-file tests/ci.env --profile ci $(COMPOSE_EXTRA)
 
 .PHONY: imagen test test-int test-legacy test-gateway lint arch check e2e
 
@@ -46,7 +46,8 @@ e2e:
 		for c in ../postman/collections/*.json; do \
 			postman collection run "$$c" \
 				-e ../postman/environments/local.postman_environment.json \
-				--env-var "baseUrl=http://localhost:$(API_PORT)" || { s=1; break; }; \
+				--env-var "baseUrl=http://localhost:$(API_PORT)" \
+				--working-dir ../postman || { s=1; break; }; \
 		done; \
 	fi; \
 	$(CI) down -v > /dev/null 2>&1; exit $$s

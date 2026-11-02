@@ -35,3 +35,9 @@ class LimiteSensible(_SinBloquearSiFallaLaCache, SimpleRateThrottle):
 
     def get_cache_key(self, request: Request, view: Any) -> str:
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
+class LimiteAsistente(_SinBloquearSiFallaLaCache, UserRateThrottle):
+    """Cada consulta ocupa el modelo varios segundos."""
+
+    scope = "asistente_v1"

@@ -68,5 +68,6 @@ REST_FRAMEWORK = {
         "anonimo_v1": os.environ.get("API_LIMITE_ANONIMO") or "60/min",
         "usuario_v1": os.environ.get("API_LIMITE_USUARIO") or "600/min",
         "sensible_v1": os.environ.get("API_LIMITE_SENSIBLE") or "10/min",
+        "asistente_v1": os.environ.get("API_LIMITE_ASISTENTE") or "20/min",
     },
 }

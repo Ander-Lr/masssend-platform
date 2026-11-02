@@ -13,6 +13,11 @@ from masssend.application.identidad.mfa import (
     DesactivarMfa,
     ResolverCuentaEnrolamiento,
 )
+from masssend.application.identidad.notificaciones import (
+    ConsultarCola,
+    ControlarCola,
+    EnviarNotificacion,
+)
 from masssend.application.identidad.puertos import IProveedorGoogle
 from masssend.application.identidad.recuperacion import (
     CambiarContrasena,
@@ -32,6 +37,8 @@ from masssend.application.identidad.sesion import (
     ValidarTotp,
 )
 from masssend.infrastructure.adapters.correo.cola import ColaEmailTask
+from masssend.infrastructure.adapters.correo.notificaciones import ColaNotificacionesDjango
+from masssend.infrastructure.adapters.correo.procesador import ProcesadorCola
 from masssend.infrastructure.adapters.google.falso import ProveedorGoogleFalso
 from masssend.infrastructure.adapters.google.oauth import ProveedorGoogleOauth
 from masssend.infrastructure.adapters.jwt.emisor import EmisorSimpleJwt
@@ -174,6 +181,22 @@ class ContenedorIdentidad:
             raiz.unidad_de_trabajo(),
             raiz.generador_ids(),
         )
+
+
+    def enviar_notificacion(self) -> EnviarNotificacion:
+        return EnviarNotificacion(ColaNotificacionesDjango(), raiz.generador_ids())
+
+    def consultar_cola(self) -> ConsultarCola:
+        return ConsultarCola(ColaNotificacionesDjango())
+
+    def controlar_cola(self) -> ControlarCola:
+        return ControlarCola(ColaNotificacionesDjango())
+
+    def maximo_adjunto_mb(self) -> int:
+        return int(settings.EMAIL_MAX_ATTACHMENT_SIZE_MB)
+
+    def procesador_cola(self) -> ProcesadorCola:
+        return ProcesadorCola()
 
 
 contenedor_identidad = ContenedorIdentidad()

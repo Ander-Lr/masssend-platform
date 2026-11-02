@@ -1,0 +1,1310 @@
+{
+  "info": {
+    "name": "05 IA y notificaciones",
+    "description": "Asistente y cola de correos. Crea sus cuentas y usa la cuenta staff del perfil ci. Corre una vez por arranque del perfil.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Preparar sesiones",
+      "item": [
+        {
+          "name": "Cuenta normal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "pm.environment.set('correosVistos', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Ana Lara\", \"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigo', v);",
+                  "  });",
+                  "});",
+                  "leer(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"codigo\": \"{{codigo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secreto', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar y obtener tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);",
+                  "pm.environment.set('accesoUsuario', pm.environment.get('acceso'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('destinatario', pm.environment.get('correo'));",
+                  "pm.environment.set('correo', 'staff@prueba.local');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secreto', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Asistente",
+      "item": [
+        {
+          "name": "Salud del asistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/asistente/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "asistente",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test(\"Esta disponible\", () => pm.expect(s.disponible).to.eql(true));",
+                  "pm.test(\"El modelo esta cargado\", () => pm.expect(s.modelo_descargado).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/asistente/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "asistente",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pregunta\": \"Cuantos creditos cuesta un mensaje?\", \"historial\": [{\"rol\": \"user\", \"contenido\": \"Hola\"}, {\"rol\": \"assistant\", \"contenido\": \"Hola, soy MassSend\"}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json();",
+                  "pm.test(\"Trae respuesta\", () => pm.expect(a.respuesta.length).to.be.above(0));",
+                  "pm.test(\"Informa el modelo\", () => pm.expect(a.modelo).to.be.a(\"string\"));",
+                  "pm.test(\"Mide la latencia\", () => pm.expect(a.latencia_ms).to.be.at.least(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pregunta vacia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/asistente/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "asistente",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pregunta\": \"   \"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rol invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/asistente/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "asistente",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pregunta\": \"hola\", \"historial\": [{\"rol\": \"system\", \"contenido\": \"x\"}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/asistente/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "asistente",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pregunta\": \"hola\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notificaciones",
+      "item": [
+        {
+          "name": "Usuario normal no envia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"destinatario\": \"{{destinatario}}\", \"asunto\": \"Aviso\", \"titulo\": \"Hola\", \"mensaje\": \"Mensaje de prueba\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo sin_permiso\", () => pm.expect(pm.response.json().codigo).to.eql(\"sin_permiso\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"destinatario\": \"{{destinatario}}\", \"asunto\": \"AvisoSimple{{$timestamp}}\", \"titulo\": \"Hola\", \"mensaje\": \"Mensaje de prueba\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "pm.test(\"La tarea es UUIDv7\", () => pm.expect(pm.response.json().tarea_id[14]).to.eql(\"7\"));",
+                  "const asunto = JSON.parse(pm.request.body.raw).asunto;",
+                  "const ver = (n) => pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('subject:' + asunto) }, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  if (!m.length) { if (n > 0) return setTimeout(() => ver(n - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.test('El trabajador lo envio', () => pm.expect(m.length).to.eql(1));",
+                  "});",
+                  "ver(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar con adjunto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "destinatario",
+                  "value": "{{destinatario}}",
+                  "type": "text"
+                },
+                {
+                  "key": "asunto",
+                  "value": "ConAdjunto",
+                  "type": "text"
+                },
+                {
+                  "key": "titulo",
+                  "value": "Hola",
+                  "type": "text"
+                },
+                {
+                  "key": "mensaje",
+                  "value": "Con archivo",
+                  "type": "text"
+                },
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/prueba.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "pm.environment.set('tareaAdjunto', pm.response.json().tarea_id);",
+                  "const ver = (n) => pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('subject:ConAdjunto') }, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  if (!m.length) { if (n > 0) return setTimeout(() => ver(n - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.test('Llega con el adjunto', () => pm.expect(m[0].Attachments).to.eql(1));",
+                  "});",
+                  "ver(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ejecutable disfrazado de PDF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "destinatario",
+                  "value": "{{destinatario}}",
+                  "type": "text"
+                },
+                {
+                  "key": "asunto",
+                  "value": "Mal",
+                  "type": "text"
+                },
+                {
+                  "key": "titulo",
+                  "value": "Hola",
+                  "type": "text"
+                },
+                {
+                  "key": "mensaje",
+                  "value": "x",
+                  "type": "text"
+                },
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/ejecutable.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cabeceras inyectadas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"destinatario\": \"{{destinatario}}\", \"asunto\": \"Hola\\nBcc: otro@prueba.local\", \"titulo\": \"Hola\", \"mensaje\": \"Mensaje de prueba\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Destinatario invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"destinatario\": \"mal\", \"asunto\": \"Aviso\", \"titulo\": \"Hola\", \"mensaje\": \"Mensaje de prueba\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo datos_invalidos\", () => pm.expect(pm.response.json().codigo).to.eql(\"datos_invalidos\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cola de correos",
+      "item": [
+        {
+          "name": "Usuario normal no ve la cola",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/tareas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "tareas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo sin_permiso\", () => pm.expect(pm.response.json().codigo).to.eql(\"sin_permiso\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar tareas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/tareas?limite=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "tareas"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Pagina\", () => pm.expect(c.datos.length).to.eql(2));",
+                  "pm.test(\"Hay mas paginas\", () => pm.expect(c.pagina.tiene_mas).to.eql(true));",
+                  "pm.test(\"No expone el contenido\", () => pm.expect(pm.response.text()).to.not.include(\"payload\"));",
+                  "pm.test(\"No esta pausada\", () => pm.expect(c.pausada).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuario normal no pausa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/pausar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "pausar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo sin_permiso\", () => pm.expect(pm.response.json().codigo).to.eql(\"sin_permiso\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pausar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/pausar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "pausar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda pausada\", () => pm.expect(pm.response.json().pausada).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar con la cola pausada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notificaciones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"destinatario\": \"{{destinatario}}\", \"asunto\": \"EnPausa{{$timestamp}}\", \"titulo\": \"Hola\", \"mensaje\": \"Mensaje de prueba\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "pm.environment.set('asuntoPausa', JSON.parse(pm.request.body.raw).asunto);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sigue sin enviarse",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/tareas?limite=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "tareas"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Sigue pendiente\", () => pm.expect(pm.response.json().datos[0].estado).to.eql(\"PENDING\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reanudar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/reanudar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "reanudar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Se reanuda\", () => pm.expect(pm.response.json().pausada).to.eql(false));",
+                  "const ver = (n) => pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('subject:' + pm.environment.get('asuntoPausa')) }, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  if (!m.length && n > 0) return setTimeout(() => ver(n - 1), 300);",
+                  "  pm.test('Sale al reanudar', () => pm.expect(m.length).to.eql(1));",
+                  "});",
+                  "ver(40);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cola-correos/tareas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "cola-correos",
+                "tareas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Trae el codigo no_autenticado\", () => pm.expect(pm.response.json().codigo).to.eql(\"no_autenticado\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

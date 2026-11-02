@@ -36,6 +36,8 @@ frontend/dist/
 
 # ── PDF y presentaciones ─────────────────────────────────
 *.pdf
+# Archivos de muestra que usa la coleccion 05 de Postman.
+!postman/archivos/*.pdf
 *.pptx
 *.ppt
 

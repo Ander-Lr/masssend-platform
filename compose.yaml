@@ -22,7 +22,7 @@ x-adaptadores-reales: &adaptadores-reales
 x-backend-ci: &backend-ci
   build:
     context: ./backend
-  environment:
+  environment: &entorno-ci
     SECRET_KEY: "${SECRET_KEY:?Define SECRET_KEY en el archivo de --env-file}"
     JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Define JWT_SECRET_KEY en el archivo de --env-file}"
     DATABASE_URL: "postgres://masssend_ci:solo-pruebas@postgres-ci:5432/masssend_ci"
@@ -32,8 +32,11 @@ x-backend-ci: &backend-ci
     CANAL_MENSAJERIA: fake
     COLA_ENVIOS: sincrona
     ALMACEN_ARCHIVOS: memoria
-    GENERADOR_TEXTO: fake
+    GENERADOR_TEXTO: "${GENERADOR_TEXTO_CI:-fake}"
+    OLLAMA_URL: "http://ollama-ci:11434"
+    OLLAMA_MODEL: "${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
     PASARELA_PAGO_FAKE: "1"
+    API_LIMITE_ASISTENTE: 100000/min
     DESTINO_CORREO: mailpit
     PROVEEDOR_GOOGLE: fake
     FREE_SIGNUP_CREDITS: "10"
@@ -88,7 +91,7 @@ services:
     build:
       context: ./backend
     container_name: masssend-email-worker
-    command: ["python", "manage.py", "process_email_queue"]
+    command: ["python", "-m", "masssend.interfaces.workers.tareas_correo"]
     env_file:
       - ./backend/.env
     environment:
@@ -180,6 +183,19 @@ services:
   backend-ci:
     <<: *backend-ci
     profiles: [ci]
+    environment:
+      <<: *entorno-ci
+      DJANGO_SUPERUSER_USERNAME: staff@prueba.local
+      DJANGO_SUPERUSER_EMAIL: staff@prueba.local
+      DJANGO_SUPERUSER_PASSWORD: clave-larga-123
+    # Crea la cuenta staff que usa la coleccion 05; existe solo en este perfil.
+    command:
+      - sh
+      - -c
+      - >-
+        until python manage.py migrate --noinput; do sleep 1; done;
+        python manage.py createsuperuser --noinput || true;
+        exec /entrypoint.sh
     ports:
       - "${API_PORT:-8000}:8000"
     healthcheck:
@@ -199,7 +215,7 @@ services:
   email-worker-ci:
     <<: *backend-ci
     profiles: [ci]
-    command: ["python", "manage.py", "process_email_queue"]
+    command: ["python", "-m", "masssend.interfaces.workers.tareas_correo"]
     depends_on:
       - backend-ci
 
@@ -213,6 +229,16 @@ services:
       POSTGRES_PASSWORD: solo-pruebas
     tmpfs:
       - /var/lib/postgresql/data
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  # Solo si se pide con GENERADOR_TEXTO_CI=ollama --profile ia.
+  ollama-ci:
+    profiles: [ia]
+    image: ollama/ollama:latest
+    volumes:
+      - masssend_ollama_models:/root/.ollama
     networks:
       - masssend_network
     restart: unless-stopped

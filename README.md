@@ -68,7 +68,7 @@ La API se publica en `/api/v1/`. Para probarla en Postman sin WhatsApp, pagos ni
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci up --build -d
 ```
 
-Importa `postman/environments/local.postman_environment.json` y las colecciones de `postman/collections/`. Los correos capturados se ven en http://localhost:8025. Para apagar y borrar los datos de prueba:
+Importa `postman/environments/local.postman_environment.json` y las colecciones de `postman/collections/`. Los archivos de muestra están en `postman/archivos/`. La colección 05 corre una vez por arranque del perfil, porque activa el doble factor de la cuenta staff. Los correos capturados se ven en http://localhost:8025. Para apagar y borrar los datos de prueba:
 
 ```bash
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci down -v

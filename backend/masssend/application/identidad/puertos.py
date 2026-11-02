@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+from masssend.domain.identidad.notificacion import Notificacion
 from masssend.domain.shared.identificadores import IdPublico
+from masssend.domain.shared.paginacion import Pagina, PeticionPagina
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,32 @@ class IColaCorreos(Protocol):
     def encolar_recuperacion(
         self, nombre: str, correo: str, token: str, minutos: int
     ) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class TareaCorreo:
+    """Nunca incluye el contenido: la tarea puede guardar codigos y enlaces."""
+
+    id: str
+    tipo: str
+    destinatario: str
+    asunto: str
+    estado: str
+    intentos: int
+    error: str | None
+    creada_en: datetime
+
+
+class IColaNotificaciones(Protocol):
+    def encolar(self, notificacion: Notificacion, tarea_id: IdPublico) -> None: ...
+
+    def tareas(self, peticion: PeticionPagina) -> Pagina[TareaCorreo]: ...
+
+    def pausada(self) -> bool: ...
+
+    def pausar(self) -> None: ...
+
+    def reanudar(self) -> None: ...
 
 
 class IEmisorTokens(Protocol):
