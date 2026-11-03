@@ -126,6 +126,17 @@ class IHistorialMensajes(Protocol):
         """Resultado de un mensaje que no salio de una campana v1 (el chat del panel)."""
         ...
 
+    def registrar_saliente(self, owner_id: IdPublico, telefono: str, texto: str) -> IdPublico:
+        """Guarda un mensaje del chat como pendiente y devuelve su id publico."""
+        ...
+
+    def registrar_resultado_de_mensaje(
+        self, mensaje_id: IdPublico, enviado: bool, id_externo: str | None, motivo: str | None
+    ) -> int:
+        """Resultado de un mensaje del chat v1, que viaja con su propio id. Solo cambia
+        un pendiente: repetirlo no cambia nada. 0 si no existe."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class EstadoConexion:

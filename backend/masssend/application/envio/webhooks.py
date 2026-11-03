@@ -116,7 +116,13 @@ class RegistrarResultado:
             # Bloquea: si el trabajador aun no confirma este envio, el aviso espera.
             envio = self._envios.bloquear(resultado.envio_id)
             if envio is None:
-                return 0
+                # No es de una campana: puede ser un mensaje del chat v1, que viaja con su id.
+                return self._historial.registrar_resultado_de_mensaje(
+                    resultado.envio_id,
+                    resultado.enviado,
+                    resultado.id_externo,
+                    resultado.motivo,
+                )
             if resultado.enviado:
                 cambio = envio.confirmar(resultado.id_externo)
             else:

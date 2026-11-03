@@ -8,6 +8,13 @@ la base y los toma el trabajador tareas_envio.
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
+from masssend.application.envio.consultas import (
+    EliminarMensajes,
+    EnviarMensajeChat,
+    GenerarReporte,
+    ListarConversaciones,
+    ListarMensajes,
+)
 from masssend.application.envio.lanzamiento import (
     CancelarCampana,
     ConsultarProgreso,
@@ -33,6 +40,7 @@ from masssend.infrastructure.persistence.campanas.repositorios import (
     RepoCampanasDjango,
     RepoContactosDjango,
 )
+from masssend.infrastructure.persistence.envio.consultas import ConsultasMensajesDjango
 from masssend.infrastructure.persistence.envio.historial import HistorialMensajesDjango
 from masssend.infrastructure.persistence.envio.repositorios import (
     RepoEnviosDjango,
@@ -123,6 +131,22 @@ class ContenedorEnvio:
 
     def cerrar_sesion_whatsapp(self) -> CerrarSesionWhatsApp:
         return CerrarSesionWhatsApp(self.conexion())
+
+    # Mensajes, conversaciones y reportes
+    def listar_mensajes(self) -> ListarMensajes:
+        return ListarMensajes(ConsultasMensajesDjango())
+
+    def eliminar_mensajes(self) -> EliminarMensajes:
+        return EliminarMensajes(ConsultasMensajesDjango(), raiz.unidad_de_trabajo())
+
+    def listar_conversaciones(self) -> ListarConversaciones:
+        return ListarConversaciones(ConsultasMensajesDjango())
+
+    def enviar_mensaje_chat(self) -> EnviarMensajeChat:
+        return EnviarMensajeChat(HistorialMensajesDjango(), self.canal(), raiz.unidad_de_trabajo())
+
+    def generar_reporte(self) -> GenerarReporte:
+        return GenerarReporte(ConsultasMensajesDjango(), raiz.reloj())
 
 
 contenedor_envio = ContenedorEnvio()

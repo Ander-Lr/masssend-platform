@@ -1,7 +1,15 @@
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import replace
+from typing import Any
 
+from masssend.application.envio.consultas import (
+    ConversacionVista,
+    FiltroMensajes,
+    MensajeVista,
+    Periodo,
+    Reporte,
+)
 from masssend.application.envio.puertos import (
     EstadoConexion,
     ResultadoCanal,
@@ -13,6 +21,8 @@ from masssend.domain.envio.envio import Envio, EstadoEnvio, Progreso
 from masssend.domain.envio.lanzamiento import Lanzamiento
 from masssend.domain.shared.errores import EstadoInvalido, ServicioNoDisponible
 from masssend.domain.shared.identificadores import IdPublico
+from masssend.domain.shared.paginacion import Pagina, PeticionPagina
+from tests.fakes.ids import GeneradorIdsSecuencial
 
 
 class RepoEnviosMemoria:
@@ -102,6 +112,9 @@ class HistorialMensajesMemoria:
         self.entrantes: list[tuple[str, str, str | None]] = []
         self.acuses: dict[str, EstadoEntrega] = {}
         self.resultados_sin_envio: list[tuple[str, bool]] = []
+        # id -> [dueno, telefono, texto, estado, id externo o motivo]
+        self.salientes: dict[IdPublico, list[Any]] = {}
+        self._ids = GeneradorIdsSecuencial()
 
     def registrar_entrante(self, telefono: str, texto: str, id_externo: str | None) -> bool:
         if id_externo and any(e[2] == id_externo for e in self.entrantes):
@@ -122,6 +135,21 @@ class HistorialMensajesMemoria:
         self.resultados_sin_envio.append((telefono, enviado))
         return 1
 
+    def registrar_saliente(self, owner_id: IdPublico, telefono: str, texto: str) -> IdPublico:
+        mensaje_id = self._ids.nuevo()
+        self.salientes[mensaje_id] = [owner_id, telefono, texto, EstadoEntrega.PENDIENTE, None]
+        return mensaje_id
+
+    def registrar_resultado_de_mensaje(
+        self, mensaje_id: IdPublico, enviado: bool, id_externo: str | None, motivo: str | None
+    ) -> int:
+        mensaje = self.salientes.get(mensaje_id)
+        if mensaje is None or mensaje[3] is not EstadoEntrega.PENDIENTE:
+            return 0
+        mensaje[3] = EstadoEntrega.ENVIADO if enviado else EstadoEntrega.FALLIDO
+        mensaje[4] = id_externo if enviado else motivo
+        return 1
+
 
 class ConexionFalsa:
     def __init__(self) -> None:
@@ -139,3 +167,37 @@ class ConexionFalsa:
 
     def cerrar_sesion(self) -> None:
         self.conectado = False
+
+
+class ConsultasMensajesMemoria:
+    """Registra lo que le piden; los listados reales se prueban en integracion."""
+
+    def __init__(self) -> None:
+        self.filtros: list[FiltroMensajes] = []
+        self.periodos: list[Periodo] = []
+        self.eliminados: list[IdPublico] = []
+
+    def mensajes(
+        self, owner_id: IdPublico, filtro: FiltroMensajes, peticion: PeticionPagina
+    ) -> Pagina[MensajeVista]:
+        self.filtros.append(filtro)
+        return Pagina(())
+
+    def eliminar_mensajes(self, owner_id: IdPublico, ids: Collection[IdPublico]) -> int:
+        self.eliminados.extend(ids)
+        return len(ids)
+
+    def conversaciones(self, peticion: PeticionPagina) -> Pagina[ConversacionVista]:
+        return Pagina(())
+
+    def reporte(self, owner_id: IdPublico, periodo: Periodo) -> Reporte:
+        self.periodos.append(periodo)
+        return Reporte(periodo)
+
+
+class CanalSinConfirmar(CanalFalso):
+    """Como WhatsApp real: acepta, pero el id llega despues por el webhook."""
+
+    def enviar(self, solicitud: SolicitudEnvio) -> ResultadoCanal:
+        resultado = super().enviar(solicitud)
+        return ResultadoCanal(resultado.aceptado, None, resultado.motivo)

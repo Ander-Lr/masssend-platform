@@ -6,6 +6,10 @@ que el chat y los reportes actuales sigan viendo lo mismo.
 
 from mass_sender.models import Contact, Message
 from masssend.domain.envio.entrega import EstadoEntrega, avanza
+from masssend.domain.shared.errores import RecursoNoEncontrado
+from masssend.domain.shared.identificadores import IdPublico
+from masssend.infrastructure.persistence.envio.models import MensajeFila
+from masssend.infrastructure.persistence.identidad.models import CuentaIdentidad
 
 A_HISTORIAL = {
     EstadoEntrega.PENDIENTE: "pending",
@@ -78,3 +82,37 @@ class HistorialMensajesDjango:
             mensaje.wpp_message_id = id_externo
         mensaje.save()
         return 1
+
+    def registrar_saliente(self, owner_id: IdPublico, telefono: str, texto: str) -> IdPublico:
+        """Como MessageService.enviar_mensaje: contacto y mensaje pendiente del staff."""
+        usuario_id = (
+            CuentaIdentidad.objects.filter(public_id=owner_id)
+            .values_list("usuario_id", flat=True)
+            .first()
+        )
+        if usuario_id is None:
+            raise RecursoNoEncontrado("La cuenta no existe.")
+        Contact.objects.get_or_create(
+            phone_number=telefono, owner_id=usuario_id, defaults={"full_name": telefono}
+        )
+        mensaje = Message.objects.create(
+            owner_id=usuario_id,
+            phone_number=telefono,
+            content=texto,
+            direction="outbound",
+            delivery_status="pending",
+        )
+        # La base genera el public_id al insertar.
+        return IdPublico(MensajeFila.objects.values_list("public_id", flat=True).get(pk=mensaje.pk))
+
+    def registrar_resultado_de_mensaje(
+        self, mensaje_id: IdPublico, enviado: bool, id_externo: str | None, motivo: str | None
+    ) -> int:
+        cambios: dict[str, object] = {"delivery_status": "sent" if enviado else "failed"}
+        if enviado and id_externo:
+            cambios["wpp_message_id"] = id_externo
+        if not enviado:
+            cambios["error_log"] = (motivo or "")[:500]
+        return MensajeFila.objects.filter(
+            public_id=mensaje_id, direction="outbound", delivery_status="pending"
+        ).update(**cambios)
