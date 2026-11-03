@@ -2,6 +2,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from masssend.domain.campanas.campana import Campana, EstadoCampana
 from masssend.domain.campanas.contacto import Contacto
 from masssend.domain.campanas.telefono import Telefono
 from masssend.domain.shared.identificadores import IdPublico
@@ -53,4 +54,44 @@ class IRepoContactos(Protocol):
 
     def etiquetas(self, owner_id: IdPublico) -> list[str]:
         """Etiquetas distintas que usa el dueno, en orden alfabetico."""
+        ...
+
+    def contar_destinatarios(self, owner_id: IdPublico, etiquetas: Collection[str]) -> int:
+        """Contactos que recibirian la campana. Ver destinatarios."""
+        ...
+
+    def destinatarios(
+        self, owner_id: IdPublico, etiquetas: Collection[str], peticion: PeticionPagina
+    ) -> Pagina[Contacto]:
+        """Contactos del dueno que no se dieron de baja y tienen alguna de las
+        etiquetas. Sin etiquetas, todos. Trasladado de destinatarios_campana."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class FiltroCampanas:
+    estado: EstadoCampana | None = None
+
+
+class IRepoCampanas(Protocol):
+    """Toda operacion recibe owner_id: una campana ajena no existe para el usuario."""
+
+    def obtener(self, owner_id: IdPublico, campana_id: IdPublico) -> Campana:
+        """Lanza RecursoNoEncontrado si no existe o es de otro dueno."""
+        ...
+
+    def bloquear(self, owner_id: IdPublico, campana_id: IdPublico) -> Campana:
+        """Como obtener, pero retiene la fila hasta confirmar."""
+        ...
+
+    def guardar(self, campana: Campana) -> None: ...
+
+    def eliminar(self, owner_id: IdPublico, campana_id: IdPublico) -> None:
+        """Borra la campana con su progreso y sus mensajes."""
+        ...
+
+    def listar(
+        self, owner_id: IdPublico, filtro: FiltroCampanas, peticion: PeticionPagina
+    ) -> Pagina[Campana]:
+        """De la mas nueva a la mas antigua, por cursor."""
         ...

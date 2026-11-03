@@ -1,62 +1,19 @@
 """Contactos contra PostgreSQL: API v1, aislamiento entre duenos e importacion por lotes."""
 
-from typing import Any
-
 import pytest
-from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
-from rest_framework_simplejwt.tokens import AccessToken
 
 from mass_sender.models import Contact
 from masssend.domain.campanas.repositorios import FiltroContactos
-from masssend.domain.shared.identificadores import IdPublico, id_publico
+from masssend.domain.shared.identificadores import id_publico
 from masssend.domain.shared.paginacion import PeticionPagina
 from masssend.infrastructure.composition.campanas import contenedor_campanas
-from masssend.infrastructure.composition.root import contenedor
 from masssend.infrastructure.persistence.campanas.models import ContactoFila
-from masssend.infrastructure.persistence.identidad.models import CuentaIdentidad
+from tests.integration.campanas.sesion import Sesion
 
 pytestmark = pytest.mark.django_db
-Usuario = get_user_model()
-API = "/api/v1/contactos"
-
-
-class Sesion:
-    """Un usuario de la v1 con su token, listo para llamar a la API."""
-
-    def __init__(self, nombre: str) -> None:
-        self.usuario = Usuario.objects.create_user(
-            f"{nombre}@prueba.local", password="clave-larga-123"
-        )
-        self.public_id: IdPublico = contenedor.generador_ids().nuevo()
-        CuentaIdentidad.objects.create(usuario=self.usuario, public_id=self.public_id)
-        token = AccessToken.for_user(self.usuario)
-        token["public_id"] = str(self.public_id)
-        self.cliente = Client(HTTP_AUTHORIZATION=f"Bearer {token}")
-
-    def get(self, ruta: str = "", **params: Any) -> Any:
-        return self.cliente.get(API + ruta, params)
-
-    def post(self, ruta: str = "", datos: Any = None) -> Any:
-        return self.cliente.post(API + ruta, datos or {}, content_type="application/json")
-
-    def patch(self, ruta: str, datos: Any) -> Any:
-        return self.cliente.patch(API + ruta, datos, content_type="application/json")
-
-    def delete(self, ruta: str) -> Any:
-        return self.cliente.delete(API + ruta)
-
-    def importar(self, contenido: str, nombre: str = "contactos.csv", **campos: Any) -> Any:
-        archivo = SimpleUploadedFile(nombre, contenido.encode(), content_type="text/csv")
-        return self.cliente.post(API + "/importar", {"archivo": archivo, **campos})
-
-    def crear(self, telefono: str, **datos: Any) -> dict[str, Any]:
-        respuesta = self.post(datos={"telefono": telefono, **datos})
-        assert respuesta.status_code == 201, respuesta.content
-        return dict(respuesta.json())
 
 
 @pytest.fixture
@@ -95,7 +52,7 @@ def test_un_telefono_invalido_responde_422_con_el_campo(ana: Sesion) -> None:
 
 
 def test_sin_token_responde_401() -> None:
-    assert Client().get(API).status_code == 401
+    assert Client().get("/api/v1/contactos").status_code == 401
 
 
 def test_un_contacto_ajeno_responde_404(ana: Sesion, luis: Sesion) -> None:

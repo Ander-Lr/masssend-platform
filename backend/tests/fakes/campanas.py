@@ -1,16 +1,43 @@
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import replace
+from typing import Protocol, TypeVar
 
+from masssend.application.campanas.puertos import ArchivoDescargado
+from masssend.domain.campanas.archivo import ArchivoCampana
+from masssend.domain.campanas.campana import Campana
 from masssend.domain.campanas.contacto import Contacto
-from masssend.domain.campanas.repositorios import FiltroContactos
+from masssend.domain.campanas.repositorios import FiltroCampanas, FiltroContactos
 from masssend.domain.campanas.telefono import Telefono
-from masssend.domain.shared.errores import EstadoInvalido, RecursoNoEncontrado
+from masssend.domain.shared.errores import (
+    EstadoInvalido,
+    RecursoNoEncontrado,
+    ServicioNoDisponible,
+)
 from masssend.domain.shared.identificadores import IdPublico
 from masssend.domain.shared.paginacion import Cursor, Pagina, PeticionPagina
 
 
+class _ConId(Protocol):
+    @property
+    def id(self) -> IdPublico: ...
+
+
+T = TypeVar("T", bound=_ConId)
+
+
 def _copia(contacto: Contacto) -> Contacto:
     return replace(contacto, datos=dict(contacto.datos))
+
+
+def _paginar(filas: Iterable[T], peticion: PeticionPagina) -> Pagina[T]:
+    """Del id mas nuevo al mas antiguo, como los repositorios reales."""
+    ordenadas = sorted(filas, key=lambda f: str(f.id), reverse=True)
+    if peticion.cursor is not None:
+        ultimo = peticion.cursor.valores[0]
+        ordenadas = [f for f in ordenadas if str(f.id) < ultimo]
+    return Pagina.desde_filas(
+        ordenadas[: peticion.limite + 1], peticion, lambda f: Cursor((str(f.id),))
+    )
 
 
 class RepoContactosMemoria:
@@ -74,7 +101,7 @@ class RepoContactosMemoria:
         self, owner_id: IdPublico, filtro: FiltroContactos, peticion: PeticionPagina
     ) -> Pagina[Contacto]:
         texto = (filtro.texto or "").lower()
-        filas = sorted(
+        return _paginar(
             (
                 _copia(c)
                 for c in self.contactos.values()
@@ -82,12 +109,78 @@ class RepoContactosMemoria:
                 and (not texto or texto in c.nombre.lower() or texto in c.telefono.numero)
                 and (filtro.etiqueta is None or filtro.etiqueta in c.etiquetas)
             ),
-            key=lambda c: str(c.id),
-            reverse=True,
+            peticion,
         )
-        if peticion.cursor is not None:
-            ultimo = peticion.cursor.valores[0]
-            filas = [c for c in filas if str(c.id) < ultimo]
-        return Pagina.desde_filas(
-            filas[: peticion.limite + 1], peticion, lambda c: Cursor((str(c.id),))
+
+    def _destinatarios(self, owner_id: IdPublico, etiquetas: Collection[str]) -> list[Contacto]:
+        return [
+            _copia(c)
+            for c in self.contactos.values()
+            if c.pertenece_a(owner_id) and c.puede_recibir and c.tiene_alguna_etiqueta(etiquetas)
+        ]
+
+    def contar_destinatarios(self, owner_id: IdPublico, etiquetas: Collection[str]) -> int:
+        return len(self._destinatarios(owner_id, etiquetas))
+
+    def destinatarios(
+        self, owner_id: IdPublico, etiquetas: Collection[str], peticion: PeticionPagina
+    ) -> Pagina[Contacto]:
+        return _paginar(self._destinatarios(owner_id, etiquetas), peticion)
+
+
+class RepoCampanasMemoria:
+    def __init__(self) -> None:
+        self.campanas: dict[IdPublico, Campana] = {}
+        self.bloqueos = 0
+
+    def obtener(self, owner_id: IdPublico, campana_id: IdPublico) -> Campana:
+        campana = self.campanas.get(campana_id)
+        if campana is None or not campana.pertenece_a(owner_id):
+            raise RecursoNoEncontrado("La campaña no existe.")
+        return replace(campana)
+
+    def bloquear(self, owner_id: IdPublico, campana_id: IdPublico) -> Campana:
+        self.bloqueos += 1
+        return self.obtener(owner_id, campana_id)
+
+    def guardar(self, campana: Campana) -> None:
+        self.campanas[campana.id] = replace(campana)
+
+    def eliminar(self, owner_id: IdPublico, campana_id: IdPublico) -> None:
+        self.obtener(owner_id, campana_id)
+        del self.campanas[campana_id]
+
+    def listar(
+        self, owner_id: IdPublico, filtro: FiltroCampanas, peticion: PeticionPagina
+    ) -> Pagina[Campana]:
+        return _paginar(
+            (
+                replace(c)
+                for c in self.campanas.values()
+                if c.pertenece_a(owner_id) and (filtro.estado is None or c.estado is filtro.estado)
+            ),
+            peticion,
         )
+
+
+class AlmacenArchivosMemoria:
+    """Guarda en un diccionario. disponible=False simula un almacen caido."""
+
+    def __init__(self) -> None:
+        self.archivos: dict[str, ArchivoCampana] = {}
+        self.disponible = True
+
+    def guardar(self, archivo: ArchivoCampana, owner_id: IdPublico, campana_id: IdPublico) -> str:
+        if not self.disponible:
+            raise ServicioNoDisponible("El almacén de archivos no responde.")
+        referencia = f"memoria://{campana_id}/{len(self.archivos) + 1}/{archivo.nombre}"
+        self.archivos[referencia] = archivo
+        return referencia
+
+    def obtener(self, referencia: str) -> ArchivoDescargado | None:
+        if not self.disponible:
+            raise ServicioNoDisponible("El almacén de archivos no responde.")
+        archivo = self.archivos.get(referencia)
+        if archivo is None:
+            return None
+        return ArchivoDescargado(archivo.nombre, archivo.tipo, archivo.contenido)

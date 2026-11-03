@@ -192,3 +192,20 @@ def test_las_etiquetas_son_del_dueno_y_sin_repetir() -> None:
     e.guardar("0992222222", etiquetas="vip")
     e.guardar("0993333333", etiquetas="secreta", dueno=e.luis)
     assert ListarEtiquetas(e.contactos).ejecutar(e.ana) == ["cliente", "vip"]
+
+
+def test_destinatarios_por_cursor_sin_bajas() -> None:
+    e = Entorno()
+    for i in range(3):
+        e.guardar(f"099111111{i}", etiquetas="vip")
+    baja, _ = e.guardar("0992222222", etiquetas="vip")
+    e.editar(baja.id, e.ana, dado_de_baja=True)
+    e.guardar("0993333333", etiquetas="vip", dueno=e.luis)
+    primera = e.contactos.destinatarios(e.ana, ["vip"], PeticionPagina(limite=2))
+    segunda = e.contactos.destinatarios(
+        e.ana, ["vip"], PeticionPagina(limite=2, cursor=primera.siguiente_cursor)
+    )
+    assert len(primera.elementos) == 2 and len(segunda.elementos) == 1
+    assert e.contactos.contar_destinatarios(e.ana, ["vip"]) == 3
+    assert e.contactos.contar_destinatarios(e.ana, ["lead"]) == 0
+    assert e.contactos.contar_destinatarios(e.ana, []) == 3
