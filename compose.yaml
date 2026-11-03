@@ -35,7 +35,11 @@ x-backend-ci: &backend-ci
     GENERADOR_TEXTO: "${GENERADOR_TEXTO_CI:-fake}"
     OLLAMA_URL: "http://ollama-ci:11434"
     OLLAMA_MODEL: "${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
-    PASARELA_PAGO_FAKE: "1"
+    # Por defecto pagos simulados. Con backend/.env.paypal se usa PayPal Sandbox.
+    PASARELA_PAGO_FAKE: "${PASARELA_PAGO_FAKE_CI:-1}"
+    PAYPAL_CLIENT_ID: "${PAYPAL_CLIENT_ID:-}"
+    PAYPAL_CLIENT_SECRET: "${PAYPAL_CLIENT_SECRET:-}"
+    PAYPAL_BASE_URL: "${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}"
     API_LIMITE_ASISTENTE: 100000/min
     # Por defecto Mailpit. Con backend/.env.gmail los correos salen por Gmail.
     DESTINO_CORREO: "${DESTINO_CORREO_CI:-mailpit}"

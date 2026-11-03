@@ -652,7 +652,13 @@
                   "pm.test(\"Se ignora el monto del cliente\", () => pm.expect(c.monto).to.eql(pm.environment.get(\"paquetePrecio\")));",
                   "pm.test(\"Se ignoran los creditos del cliente\", () => pm.expect(c.creditos).to.eql(pm.environment.get(\"paqueteCreditos\")));",
                   "pm.test(\"El id es UUIDv7\", () => pm.expect(c.compra_id[14]).to.eql(\"7\"));",
-                  "pm.environment.set('compraId', c.compra_id);"
+                  "pm.environment.set('compraId', c.compra_id);",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  pm.test(\"Lleva a PayPal Sandbox\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/www\\.sandbox\\.paypal\\.com\\//));",
+                  "  console.log('Modo paypal: abre esta URL, paga con tu cuenta personal de Sandbox y luego ejecuta Confirmar: ' + c.url_pago);",
+                  "} else {",
+                  "  pm.test(\"Usa la pasarela simulada\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/pasarela\\.falsa\\//));",
+                  "}"
                 ]
               }
             }
@@ -690,6 +696,19 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PayPal real no acepta respuestas simuladas en datos_pasarela.",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: este paso solo aplica a la pasarela simulada.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -734,6 +753,19 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PayPal real no acepta respuestas simuladas en datos_pasarela.",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: este paso solo aplica a la pasarela simulada.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -814,6 +846,17 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: si aun no pagaste en el navegador, la compra queda rechazada; paga y vuelve a confirmar.');",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
