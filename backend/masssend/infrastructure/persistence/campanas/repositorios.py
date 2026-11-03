@@ -182,6 +182,11 @@ class RepoContactosDjango:
         )
         return sorted({etiqueta for texto in textos for etiqueta in limpiar_etiquetas(texto)})
 
+    def dar_de_baja_en_todas_las_libretas(self, telefono: Telefono) -> int:
+        return ContactoFila.objects.filter(phone_number=telefono.numero, is_opted_out=False).update(
+            is_opted_out=True
+        )
+
     def _destinatarios(
         self, owner_id: IdPublico, etiquetas: Collection[str]
     ) -> QuerySet[ContactoFila]:

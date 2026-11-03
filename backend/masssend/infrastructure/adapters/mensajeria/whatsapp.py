@@ -13,8 +13,8 @@ import requests
 from django.conf import settings
 
 from masssend.application.campanas.puertos import ArchivoDescargado, IAlmacenArchivos
-from masssend.application.envio.puertos import ResultadoCanal, SolicitudEnvio
-from masssend.domain.shared.errores import ServicioNoDisponible
+from masssend.application.envio.puertos import EstadoConexion, ResultadoCanal, SolicitudEnvio
+from masssend.domain.shared.errores import EstadoInvalido, ServicioNoDisponible
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,38 @@ class CanalWhatsApp:
             "media_mimetype": archivo.tipo,
             "media_filename": archivo.nombre,
         }
+
+
+class ConexionWhatsApp:
+    """Lo que hacian api_qr_status, api_request_pairing y api_cambiar_numero."""
+
+    @property
+    def _url(self) -> str:
+        return str(settings.WHATSAPP_API_URL).rstrip("/")
+
+    def _pedir(self, metodo: str, ruta: str, **datos: Any) -> requests.Response:
+        try:
+            return requests.request(metodo, f"{self._url}{ruta}", timeout=15, **datos)
+        except requests.RequestException as error:
+            raise ServicioNoDisponible(NO_DISPONIBLE) from error
+
+    def estado(self) -> EstadoConexion:
+        datos = _json(self._pedir("GET", "/api/qr"))
+        return EstadoConexion(bool(datos.get("ready")), datos.get("pairing_code") or None)
+
+    def solicitar_vinculacion(self, telefono: str) -> str | None:
+        respuesta = self._pedir("POST", "/api/request-pairing", json={"phone": telefono})
+        datos = _json(respuesta)
+        if respuesta.status_code == 400:
+            raise EstadoInvalido(str(datos.get("error") or "No se pudo vincular el número."))
+        if not respuesta.ok:
+            raise ServicioNoDisponible(_error(respuesta))
+        return datos.get("code") or None
+
+    def cerrar_sesion(self) -> None:
+        respuesta = self._pedir("POST", "/api/logout")
+        if not respuesta.ok:
+            raise ServicioNoDisponible(_error(respuesta))
 
 
 def _json(respuesta: requests.Response) -> dict[str, Any]:

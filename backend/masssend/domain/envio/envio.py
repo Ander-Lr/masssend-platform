@@ -62,6 +62,27 @@ class Envio:
     def cancelar(self) -> None:
         self._cerrar(EstadoEnvio.CANCELADO)
 
+    def confirmar(self, id_externo: str | None) -> bool:
+        """WhatsApp confirmo que salio. Guarda su id si aun no lo tenia.
+
+        Devuelve True si algo cambio; repetir la confirmacion no cambia nada.
+        """
+        if self.estado is not EstadoEnvio.ENVIADO or not id_externo or self.id_externo:
+            return False
+        self.id_externo = id_externo
+        return True
+
+    def rebotar(self, motivo: str) -> bool:
+        """El gateway acepto el mensaje pero WhatsApp no pudo entregarlo.
+
+        Devuelve True si algo cambio; un rebote repetido no cambia nada.
+        """
+        if self.estado is not EstadoEnvio.ENVIADO:
+            return False
+        self.estado = EstadoEnvio.FALLIDO
+        self.detalle = motivo[:MAX_DETALLE] if motivo else "WhatsApp no entregó el mensaje."
+        return True
+
 
 @dataclass(frozen=True, slots=True)
 class Progreso:

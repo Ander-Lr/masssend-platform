@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from masssend.domain.envio.entrega import EstadoEntrega
 from masssend.domain.shared.identificadores import IdPublico
 
 
@@ -106,3 +107,44 @@ class IColaEnvios(Protocol):
         """Programa cada trabajo para que corra tras su retraso. Puede entregar
         un trabajo mas de una vez: procesarlo debe ser idempotente."""
         ...
+
+
+class IHistorialMensajes(Protocol):
+    """El historial de mensajes del sistema actual, que leen el chat y los reportes."""
+
+    def registrar_entrante(self, telefono: str, texto: str, id_externo: str | None) -> bool:
+        """Guarda un mensaje recibido. False si ese id ya se habia registrado."""
+        ...
+
+    def registrar_acuse(self, id_externo: str, estado: EstadoEntrega) -> int:
+        """Avanza el estado de entrega; nunca retrocede. Devuelve cuantos cambiaron."""
+        ...
+
+    def registrar_resultado_sin_envio(
+        self, telefono: str, enviado: bool, id_externo: str | None, motivo: str | None
+    ) -> int:
+        """Resultado de un mensaje que no salio de una campana v1 (el chat del panel)."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class EstadoConexion:
+    conectado: bool
+    codigo_vinculacion: str | None = None
+
+
+class IConexionWhatsApp(Protocol):
+    """Vinculacion del numero de la plataforma.
+
+    Lanza ServicioNoDisponible si el gateway no responde.
+    """
+
+    def estado(self) -> EstadoConexion: ...
+
+    def solicitar_vinculacion(self, telefono: str) -> str | None:
+        """Devuelve el codigo que se escribe en WhatsApp, o None si el gateway aun lo
+        esta generando (aparece luego en estado). Lanza EstadoInvalido si ya hay un
+        numero conectado."""
+        ...
+
+    def cerrar_sesion(self) -> None: ...

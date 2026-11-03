@@ -2,10 +2,16 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import replace
 
-from masssend.application.envio.puertos import ResultadoCanal, SolicitudEnvio, TrabajoEnvio
+from masssend.application.envio.puertos import (
+    EstadoConexion,
+    ResultadoCanal,
+    SolicitudEnvio,
+    TrabajoEnvio,
+)
+from masssend.domain.envio.entrega import EstadoEntrega, avanza
 from masssend.domain.envio.envio import Envio, EstadoEnvio, Progreso
 from masssend.domain.envio.lanzamiento import Lanzamiento
-from masssend.domain.shared.errores import ServicioNoDisponible
+from masssend.domain.shared.errores import EstadoInvalido, ServicioNoDisponible
 from masssend.domain.shared.identificadores import IdPublico
 
 
@@ -89,3 +95,47 @@ class ColaMemoria:
 
     def publicar(self, trabajos: Sequence[TrabajoEnvio]) -> None:
         self.trabajos.extend(trabajos)
+
+
+class HistorialMensajesMemoria:
+    def __init__(self) -> None:
+        self.entrantes: list[tuple[str, str, str | None]] = []
+        self.acuses: dict[str, EstadoEntrega] = {}
+        self.resultados_sin_envio: list[tuple[str, bool]] = []
+
+    def registrar_entrante(self, telefono: str, texto: str, id_externo: str | None) -> bool:
+        if id_externo and any(e[2] == id_externo for e in self.entrantes):
+            return False
+        self.entrantes.append((telefono, texto, id_externo))
+        return True
+
+    def registrar_acuse(self, id_externo: str, estado: EstadoEntrega) -> int:
+        actual = self.acuses.get(id_externo)
+        if actual is None or not avanza(actual, estado):
+            return 0
+        self.acuses[id_externo] = estado
+        return 1
+
+    def registrar_resultado_sin_envio(
+        self, telefono: str, enviado: bool, id_externo: str | None, motivo: str | None
+    ) -> int:
+        self.resultados_sin_envio.append((telefono, enviado))
+        return 1
+
+
+class ConexionFalsa:
+    def __init__(self) -> None:
+        self.conectado = False
+        self.vinculaciones: list[str] = []
+
+    def estado(self) -> EstadoConexion:
+        return EstadoConexion(self.conectado)
+
+    def solicitar_vinculacion(self, telefono: str) -> str:
+        if self.conectado:
+            raise EstadoInvalido("Ya hay un número conectado.")
+        self.vinculaciones.append(telefono)
+        return "ABCD-1234"
+
+    def cerrar_sesion(self) -> None:
+        self.conectado = False

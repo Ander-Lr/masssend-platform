@@ -119,6 +119,14 @@ class RepoContactosMemoria:
             if c.pertenece_a(owner_id) and c.puede_recibir and c.tiene_alguna_etiqueta(etiquetas)
         ]
 
+    def dar_de_baja_en_todas_las_libretas(self, telefono: Telefono) -> int:
+        cambiados = 0
+        for contacto in self.contactos.values():
+            if contacto.telefono == telefono and contacto.puede_recibir:
+                contacto.dar_de_baja()
+                cambiados += 1
+        return cambiados
+
     def contar_destinatarios(self, owner_id: IdPublico, etiquetas: Collection[str]) -> int:
         return len(self._destinatarios(owner_id, etiquetas))
 

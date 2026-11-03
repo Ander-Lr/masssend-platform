@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "04 Envio",
-    "description": "Lanzamiento, progreso y cancelacion de campanas con el canal falso y la cola sincrona del perfil ci. Usa los creditos reales de la coleccion 02: reserva al lanzar, cobra cada mensaje que sale y devuelve lo que no se uso. Crea sus propias cuentas A y B, asi que corre sola.",
+    "description": "Lanzamiento, progreso y cancelacion de campanas con el canal falso y la cola sincrona del perfil ci. Usa los creditos reales de la coleccion 02: reserva al lanzar, cobra cada mensaje que sale y devuelve lo que no se uso. Despues, los webhooks firmados del gateway (BAJA incluida) y las rutas de WhatsApp para staff. Crea sus propias cuentas A y B, asi que corre sola.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1879,6 +1879,734 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Webhooks y WhatsApp",
+      "description": "Avisos firmados del gateway. La firma usa la variable de coleccion webhookSecreto, que debe ser igual a WHATSAPP_WEBHOOK_TOKEN del servidor (solo-pruebas en el perfil ci).",
+      "item": [
+        {
+          "name": "Aviso sin firma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Firma con otro secreto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, 'otro-secreto').toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aviso vencido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000) - 400);",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensaje entrante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('idEntrante', 'wa.' + Date.now());",
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Se registra\", () => pm.expect(pm.response.json()).to.eql({repetido: false, baja: false, contactos_dados_de_baja: 0}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El mismo mensaje otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No se duplica\", () => pm.expect(pm.response.json().repetido).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedro escribe BAJA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idBaja}}\", \"telefono\": \"593991112222\", \"texto\": \"Baja\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('idBaja', 'wa.baja.' + Date.now());",
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Se reconoce la baja\", () => pm.expect(r.baja).to.eql(true));",
+                  "pm.test(\"Se da de baja en las libretas\", () => pm.expect(r.contactos_dados_de_baja).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedro queda de baja",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{envioPedro}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{envioPedro}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Ya no recibe campanas\", () => pm.expect(pm.response.json().dado_de_baja).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acuse de un mensaje desconocido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/acuses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "acuses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id_externo\": \"wamid.desconocido\", \"estado\": \"leido\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No cambia nada\", () => pm.expect(pm.response.json().actualizados).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resultado de un envio desconocido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/resultados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "resultados"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"envio_id\": \"{{campanaEnvio}}\", \"telefono\": \"593991112222\", \"estado\": \"enviado\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No cambia nada\", () => pm.expect(pm.response.json().actualizados).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acuse con estado invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/acuses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "acuses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id_externo\": \"x\", \"estado\": \"visto\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resultado con envio_id invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/resultados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "resultados"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"envio_id\": \"abc\", \"telefono\": \"1\", \"estado\": \"enviado\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo envio_id\", () => pm.expect(pm.response.json().campo).to.eql(\"envio_id\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de WhatsApp sin ser staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "estado"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vincular sin ser staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/vinculacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "vinculacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0991112222\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar sesion sin ser staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/cerrar-sesion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "cerrar-sesion"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de WhatsApp sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "estado"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "webhookSecreto",
+      "value": "solo-pruebas",
+      "type": "string"
     }
   ]
 }

@@ -44,6 +44,7 @@ x-backend-ci: &backend-ci
     API_LIMITE_USUARIO: 100000/min
     API_LIMITE_SENSIBLE: 100000/min
     EMAIL_QUEUE_INTERVAL_MS: "200"
+    WHATSAPP_WEBHOOK_TOKEN: "${WHATSAPP_WEBHOOK_TOKEN:-solo-pruebas}"
   networks:
     - masssend_network
   restart: unless-stopped

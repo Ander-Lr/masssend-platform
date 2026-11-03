@@ -56,6 +56,11 @@ class IRepoContactos(Protocol):
         """Etiquetas distintas que usa el dueno, en orden alfabetico."""
         ...
 
+    def dar_de_baja_en_todas_las_libretas(self, telefono: Telefono) -> int:
+        """Operacion del sistema, no de un dueno: quien escribe BAJA al numero de la
+        plataforma no quiere mensajes de nadie. Devuelve cuantos contactos cambiaron."""
+        ...
+
     def contar_destinatarios(self, owner_id: IdPublico, etiquetas: Collection[str]) -> int:
         """Contactos que recibirian la campana. Ver destinatarios."""
         ...

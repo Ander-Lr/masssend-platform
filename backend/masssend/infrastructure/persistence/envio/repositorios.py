@@ -62,7 +62,22 @@ class RepoEnviosDjango:
         fila.texto = envio.texto
         if envio.estado in ESTADO_MENSAJE and fila.mensaje_id is None:
             fila.mensaje = self._mensaje_actual(envio)
+        elif fila.mensaje_id is not None:
+            self._sincronizar_mensaje(fila.mensaje_id, envio)
         fila.save()
+
+    @staticmethod
+    def _sincronizar_mensaje(mensaje_id: int, envio: Envio) -> None:
+        """Un rebote o el id que confirma WhatsApp tambien llegan al historial.
+        Un entregado o leido ya registrado no se pisa con enviado."""
+        if envio.id_externo:
+            Message.objects.filter(pk=mensaje_id, wpp_message_id__isnull=True).update(
+                wpp_message_id=envio.id_externo
+            )
+        if envio.estado is EstadoEnvio.FALLIDO:
+            Message.objects.filter(pk=mensaje_id).update(
+                delivery_status="failed", error_log=envio.detalle
+            )
 
     @staticmethod
     def _mensaje_actual(envio: Envio) -> Message:
