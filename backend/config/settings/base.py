@@ -34,6 +34,14 @@ COLA_ENVIOS = _opcion("COLA_ENVIOS", ("celery", "memoria", "sincrona"), "celery"
 ALMACEN_ARCHIVOS = _opcion("ALMACEN_ARCHIVOS", ("pocketbase", "memoria"), "pocketbase")
 GENERADOR_TEXTO = _opcion("GENERADOR_TEXTO", ("ollama", "fake"), "ollama")
 PASARELA_PAGO_FAKE = _opcion("PASARELA_PAGO_FAKE", ("0", "1"), "0") == "1"
+# Cada pasarela puede fijarse en real o falsa; auto sigue a PASARELA_PAGO_FAKE.
+PASARELA_PAYPAL = _opcion("PASARELA_PAYPAL", ("auto", "real", "falsa"), "auto")
+PASARELA_PAYPHONE = _opcion("PASARELA_PAYPHONE", ("auto", "real", "falsa"), "auto")
+# PayPhone redirige aqui con ?id=...&clientTransactionId=... despues del pago.
+PAYPHONE_RETORNO_V1 = (
+    os.environ.get("PAYPHONE_RETORNO_V1")
+    or f"{FRONTEND_URL}/billing/return?provider=payphone"  # noqa: F405
+)
 DESTINO_CORREO = _opcion("DESTINO_CORREO", ("gmail", "mailpit"), "gmail")
 PROVEEDOR_GOOGLE = _opcion("PROVEEDOR_GOOGLE", ("google", "fake"), "google")
 GOOGLE_RETORNO_V1 = (

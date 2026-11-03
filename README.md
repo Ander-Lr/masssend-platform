@@ -112,6 +112,12 @@ docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend
 
 En el entorno de Postman cambia `modoPago` a `paypal`. **Checkout** devuelve la URL de PayPal: ábrela, paga con la cuenta *Personal* de Sandbox y luego ejecuta **Confirmar**. Al terminar, PayPal redirige a `localhost:5173`; mientras no exista el frontend, esa página no carga y no afecta al pago. **Pago rechazado** y **Cobro por otro monto** se omiten en este modo, porque PayPal no acepta respuestas simuladas.
 
+### Pagos con PayPhone (ambiente de pruebas)
+
+PayPhone usa su botón de pago: el backend prepara el cobro, el cliente paga en el formulario de PayPhone y vuelve a la URL de respuesta con `?id=...&clientTransactionId=...`; ese `id` se envía al confirmar. En Payphone Developer crea una aplicación **WEB** en ambiente **PRUEBAS**, con la URL de respuesta `http://localhost:5173/billing/return?provider=payphone`. Copia `backend/.env.payphone.example` como `backend/.env.payphone` y pega el token y el StoreID de la pestaña *Credenciales*. `./levantar.sh` lo carga solo. Cada pasarela se activa por separado: PayPhone real no vuelve real a PayPal.
+
+En Postman cambia `modoPayphone` a `payphone` y usa la carpeta **PayPhone** de la colección 02. Después de pagar, copia el `id` de la URL de retorno en `payphoneId` y ejecuta **Confirmar PayPhone** antes de 5 minutos: si no se confirma a tiempo, PayPhone revierte el cobro.
+
 ## Estructura
 
 ```

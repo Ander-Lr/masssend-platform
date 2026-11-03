@@ -1561,6 +1561,301 @@
           ]
         }
       ]
+    },
+    {
+      "name": "PayPhone",
+      "item": [
+        {
+          "name": "Saldo antes de PayPhone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/saldo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set('saldoAntesPayphone', pm.response.json().saldo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Checkout PayPhone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pagos/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pagos",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"paquete_id\": {{paqueteId}}, \"pasarela\": \"payphone\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('payphoneId', '');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Usa PayPhone\", () => pm.expect(c.pasarela).to.eql(\"PAYPHONE\"));",
+                  "pm.test(\"Cobra el precio del paquete\", () => pm.expect(c.monto).to.eql(pm.environment.get(\"paquetePrecio\")));",
+                  "pm.environment.set('compraPayphone', c.compra_id);",
+                  "if (pm.environment.get('modoPayphone') === 'payphone') {",
+                  "  pm.test(\"Lleva al formulario de PayPhone\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\//).and.not.include('pasarela.falsa'));",
+                  "  console.log('Modo payphone: abre esta URL, paga y copia en payphoneId el id de la URL de retorno. Tienes 5 minutos para Confirmar PayPhone: ' + c.url_pago);",
+                  "} else {",
+                  "  pm.test(\"Usa la pasarela simulada\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/pasarela\\.falsa\\//));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar PayPhone sin id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pagos/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pagos",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"compra_id\": \"{{compraPayphone}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La pasarela simulada no pide el id del retorno.",
+                  "if (!(pm.environment.get('modoPayphone') === 'payphone')) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Senala datos_pasarela\", () => pm.expect(pm.response.json().campo).to.eql(\"datos_pasarela\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar PayPhone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pagos/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pagos",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"compra_id\": \"{{compraPayphone}}\", \"datos_pasarela\": {\"id\": \"{{payphoneId}}\"}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('modoPayphone') === 'payphone') {",
+                  "  if (!pm.environment.get('payphoneId')) throw new Error('Copia en payphoneId el id que PayPhone agrega a la URL de retorno');",
+                  "} else {",
+                  "  pm.environment.set('payphoneId', '1');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda aprobada\", () => pm.expect(pm.response.json().estado).to.eql(\"aprobada\"));",
+                  "pm.test(\"Es la primera vez\", () => pm.expect(pm.response.json().ya_procesada).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar PayPhone repetido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pagos/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pagos",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"compra_id\": \"{{compraPayphone}}\", \"datos_pasarela\": {\"id\": \"{{payphoneId}}\"}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Ya estaba procesada\", () => pm.expect(pm.response.json().ya_procesada).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Saldo tras PayPhone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/saldo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Suma el paquete una sola vez\", () => pm.expect(pm.response.json().saldo).to.eql(pm.environment.get('saldoAntesPayphone') + pm.environment.get('paqueteCreditos')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

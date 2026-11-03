@@ -35,8 +35,15 @@ x-backend-ci: &backend-ci
     GENERADOR_TEXTO: "${GENERADOR_TEXTO_CI:-fake}"
     OLLAMA_URL: "http://ollama-ci:11434"
     OLLAMA_MODEL: "${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
-    # Por defecto pagos simulados. Con backend/.env.paypal se usa PayPal Sandbox.
+    # Por defecto pagos simulados. backend/.env.paypal y backend/.env.payphone
+    # activan cada pasarela real por separado.
     PASARELA_PAGO_FAKE: "${PASARELA_PAGO_FAKE_CI:-1}"
+    PASARELA_PAYPAL: "${PASARELA_PAYPAL_CI:-auto}"
+    PASARELA_PAYPHONE: "${PASARELA_PAYPHONE_CI:-auto}"
+    PAYPHONE_TOKEN: "${PAYPHONE_TOKEN:-}"
+    PAYPHONE_STORE_ID: "${PAYPHONE_STORE_ID:-}"
+    PAYPHONE_BASE_URL: "${PAYPHONE_BASE_URL:-https://pay.payphonetodoesposible.com}"
+    PAYPHONE_RETORNO_V1: "${PAYPHONE_RETORNO_V1:-}"
     PAYPAL_CLIENT_ID: "${PAYPAL_CLIENT_ID:-}"
     PAYPAL_CLIENT_SECRET: "${PAYPAL_CLIENT_SECRET:-}"
     PAYPAL_BASE_URL: "${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}"

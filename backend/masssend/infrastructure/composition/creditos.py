@@ -25,6 +25,14 @@ from masssend.infrastructure.persistence.creditos.repositorios import (
 )
 
 
+def pasarelas_reales() -> frozenset[str]:
+    """auto sigue a PASARELA_PAGO_FAKE; real o falsa lo fijan por pasarela."""
+    por_defecto = "falsa" if settings.PASARELA_PAGO_FAKE else "real"
+    modos = {"PAYPAL": settings.PASARELA_PAYPAL, "PAYPHONE": settings.PASARELA_PAYPHONE}
+    elegidos = {nombre: por_defecto if modo == "auto" else modo for nombre, modo in modos.items()}
+    return frozenset(nombre for nombre, modo in elegidos.items() if modo == "real")
+
+
 class ContenedorCreditos:
     def consultar_saldo(self) -> ConsultarSaldo:
         return ConsultarSaldo(RepoBilleterasDjango())
@@ -38,7 +46,7 @@ class ContenedorCreditos:
     def iniciar_compra(self) -> IniciarCompra:
         return IniciarCompra(
             ConsultasCreditosDjango(),
-            SelectorPasarelas(settings.PASARELA_PAGO_FAKE),
+            SelectorPasarelas(pasarelas_reales()),
             RepoComprasDjango(),
             raiz.generador_ids(),
             raiz.unidad_de_trabajo(),
@@ -46,7 +54,7 @@ class ContenedorCreditos:
 
     def confirmar_compra(self) -> ConfirmarCompra:
         return ConfirmarCompra(
-            SelectorPasarelas(settings.PASARELA_PAGO_FAKE),
+            SelectorPasarelas(pasarelas_reales()),
             RepoComprasDjango(),
             RepoBilleterasDjango(),
             raiz.unidad_de_trabajo(),

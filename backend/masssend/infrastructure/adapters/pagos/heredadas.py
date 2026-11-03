@@ -1,8 +1,7 @@
-"""Envuelve las pasarelas actuales de billing, sin reescribirlas."""
+"""Envuelve la pasarela PayPal de billing, sin reescribirla."""
 
 import logging
 from collections.abc import Callable
-from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import Any
 
@@ -11,7 +10,6 @@ from django.conf import settings
 
 from billing.services.gateways.base import PaymentGateway
 from billing.services.gateways.paypal_gateway import PayPalGateway
-from billing.services.gateways.payphone_gateway import PayPhoneGateway
 from billing.utils.errors import AppError
 from masssend.application.creditos.puertos import CobroConfirmado, CobroIniciado, Paquete
 from masssend.domain.shared.dinero import Dinero
@@ -28,12 +26,6 @@ def monto_paypal(respuesta: dict[str, Any]) -> Dinero | None:
     except (KeyError, IndexError, TypeError, DatosInvalidos):
         return None
 
-
-def monto_payphone(respuesta: dict[str, Any]) -> Dinero | None:
-    try:
-        return Dinero(int(Decimal(str(respuesta["amount"]))))
-    except (KeyError, InvalidOperation, ValueError, DatosInvalidos):
-        return None
 
 
 class PasarelaHeredada:
@@ -88,7 +80,3 @@ def paypal() -> PasarelaHeredada:
         # Sin credenciales PayPal responde 401 y el error no diria la causa.
         raise ServicioNoDisponible("PayPal no está configurado.")
     return PasarelaHeredada(PayPalGateway(), monto_paypal)
-
-
-def payphone() -> PasarelaHeredada:
-    return PasarelaHeredada(PayPhoneGateway(), monto_payphone)

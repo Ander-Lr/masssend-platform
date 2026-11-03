@@ -15,7 +15,9 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from billing.models import CreditPack, CreditWallet, PaymentTransaction
 from masssend.domain.shared.dinero import Dinero
-from masssend.infrastructure.adapters.pagos.heredadas import monto_paypal, monto_payphone
+from masssend.infrastructure.adapters.pagos.heredadas import monto_paypal
+from masssend.infrastructure.adapters.pagos.payphone import id_cliente, monto
+from masssend.infrastructure.composition.creditos import pasarelas_reales
 from masssend.infrastructure.composition.root import contenedor
 from masssend.infrastructure.persistence.identidad.models import CuentaIdentidad
 
@@ -286,24 +288,249 @@ def test_si_paypal_cae_responde_503_y_la_compra_sigue_pendiente(
     assert PaymentTransaction.objects.get().status == PaymentTransaction.STATUS_PENDING
 
 
-def test_payphone_exige_su_id_al_confirmar(client: Client, settings: Any) -> None:
-    settings.PASARELA_PAGO_FAKE = False
-    _, cabecera = cuenta()
-    ruta = "billing.services.gateways.payphone_gateway.requests.post"
-    simulada = respuesta_http({"payWithPayPhone": "https://payphone.prueba"})
-    with patch(ruta, return_value=simulada):
+@pytest.mark.parametrize(
+    ("fake", "paypal", "payphone", "reales"),
+    [
+        (True, "auto", "auto", set()),
+        (False, "auto", "auto", {"PAYPAL", "PAYPHONE"}),
+        (True, "real", "auto", {"PAYPAL"}),
+        (True, "auto", "real", {"PAYPHONE"}),
+        (False, "falsa", "auto", {"PAYPHONE"}),
+        (False, "real", "falsa", {"PAYPAL"}),
+    ],
+)
+def test_cada_pasarela_se_activa_por_separado(
+    settings: Any, fake: bool, paypal: str, payphone: str, reales: set[str]
+) -> None:
+    settings.PASARELA_PAGO_FAKE = fake
+    settings.PASARELA_PAYPAL = paypal
+    settings.PASARELA_PAYPHONE = payphone
+    assert pasarelas_reales() == reales
+
+
+RUTA_PAYPHONE = "masssend.infrastructure.adapters.pagos.payphone.requests.post"
+PREPARADO = {
+    "paymentId": "pago-1",
+    "payWithCard": "https://pay.payphonetodoesposible.com/Anonymous/Pay?id=1",
+    "payWithPayPhone": "https://payp.page.link/abc",
+}
+
+
+def payphone_real(settings: Any) -> None:
+    settings.PASARELA_PAYPHONE = "real"
+    settings.PAYPHONE_TOKEN = "token-de-prueba"
+    settings.PAYPHONE_STORE_ID = "tienda-1"
+    settings.PAYPHONE_BASE_URL = "https://payphone.prueba/"
+    settings.PAYPHONE_RETORNO_V1 = "http://localhost:5173/billing/return?provider=payphone"
+
+
+def iniciar_payphone(client: Client, cabecera: dict[str, str]) -> tuple[dict[str, Any], Any]:
+    with patch(RUTA_PAYPHONE, return_value=respuesta_http(PREPARADO)) as llamada:
         respuesta = post(
             client, "checkout", {"paquete_id": paquete().id, "pasarela": "payphone"}, cabecera
         )
-    compra = respuesta.json()
-    assert compra["url_pago"] == "https://payphone.prueba"
-    confirmacion = post(client, "confirmar", {"compra_id": compra["compra_id"]}, cabecera)
-    assert confirmacion.status_code == 422
-    assert confirmacion.json()["campo"] == "datos_pasarela"
+    assert respuesta.status_code == 201, respuesta.content
+    return respuesta.json(), llamada
+
+
+def confirmacion_payphone(
+    referencia: str, estado: int = 3, monto_centavos: int = 450
+) -> dict[str, Any]:
+    return {
+        "statusCode": estado,
+        "transactionStatus": "Approved" if estado == 3 else "Canceled",
+        "clientTransactionId": referencia,
+        "amount": monto_centavos,
+        "currency": "USD",
+        "transactionId": 123,
+        "email": "cliente@correo.ec",
+        "lastDigits": "4242",
+    }
+
+
+def confirmar_payphone(
+    client: Client, cabecera: dict[str, str], compra_id: str, cuerpo: Any, estado_http: int = 200
+) -> tuple[Any, Any]:
+    with patch(RUTA_PAYPHONE, return_value=respuesta_http(cuerpo, estado_http)) as llamada:
+        respuesta = post(
+            client,
+            "confirmar",
+            {"compra_id": compra_id, "datos_pasarela": {"id": "123"}},
+            cabecera,
+        )
+    return respuesta, llamada
+
+
+def test_payphone_prepara_el_boton_con_el_precio_del_paquete(
+    client: Client, settings: Any
+) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    compra, llamada = iniciar_payphone(client, cabecera)
+    assert compra["url_pago"] == PREPARADO["payWithCard"]
+    assert compra["pasarela"] == "PAYPHONE"
+    url = llamada.call_args.args[0]
+    cuerpo = llamada.call_args.kwargs["json"]
+    assert url == "https://payphone.prueba/api/button/Prepare"
+    assert llamada.call_args.kwargs["headers"]["Authorization"] == "Bearer token-de-prueba"
+    assert cuerpo["amount"] == cuerpo["amountWithoutTax"] == 450
+    assert cuerpo["storeId"] == "tienda-1"
+    assert cuerpo["responseUrl"] == settings.PAYPHONE_RETORNO_V1
+    assert cuerpo["clientTransactionId"] == id_cliente(compra["compra_id"])
+    assert len(cuerpo["clientTransactionId"]) <= 15
+    assert PaymentTransaction.objects.get().provider_reference == cuerpo["clientTransactionId"]
+
+
+def test_payphone_aprobado_acredita_una_vez(client: Client, settings: Any) -> None:
+    payphone_real(settings)
+    usuario, cabecera = cuenta()
+    compra, _ = iniciar_payphone(client, cabecera)
+    referencia = id_cliente(compra["compra_id"])
+    respuesta, llamada = confirmar_payphone(
+        client, cabecera, compra["compra_id"], confirmacion_payphone(referencia)
+    )
+    assert respuesta.json() == {"estado": "aprobada", "creditos": 100, "ya_procesada": False}
+    assert llamada.call_args.args[0] == "https://payphone.prueba/api/button/V2/Confirm"
+    assert llamada.call_args.kwargs["json"] == {"id": 123, "clientTxId": referencia}
+    assert saldo(usuario) == 100
+    otra, otra_llamada = confirmar_payphone(
+        client, cabecera, compra["compra_id"], confirmacion_payphone(referencia)
+    )
+    assert otra.json()["ya_procesada"] is True
+    otra_llamada.assert_not_called()
+    assert saldo(usuario) == 100
+
+
+def test_payphone_no_guarda_correo_ni_tarjeta(client: Client, settings: Any) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    compra, _ = iniciar_payphone(client, cabecera)
+    referencia = id_cliente(compra["compra_id"])
+    confirmar_payphone(client, cabecera, compra["compra_id"], confirmacion_payphone(referencia))
+    guardado = PaymentTransaction.objects.get().raw_response
+    assert guardado["statusCode"] == 3
+    assert "email" not in guardado
+    assert "lastDigits" not in guardado
+
+
+@pytest.mark.parametrize(
+    "cambio",
+    [
+        {"statusCode": 2},
+        {"clientTransactionId": "MSOTRACOMPRA01"},
+        {"amount": 1},
+    ],
+    ids=["cancelado", "id-de-otra-compra", "otro-monto"],
+)
+def test_payphone_no_acredita_si_el_cobro_no_coincide(
+    client: Client, settings: Any, cambio: dict[str, Any]
+) -> None:
+    payphone_real(settings)
+    usuario, cabecera = cuenta()
+    compra, _ = iniciar_payphone(client, cabecera)
+    cuerpo = {**confirmacion_payphone(id_cliente(compra["compra_id"])), **cambio}
+    respuesta, _ = confirmar_payphone(client, cabecera, compra["compra_id"], cuerpo)
+    assert respuesta.json()["estado"] == "rechazada"
+    assert saldo(usuario) == 0
+
+
+@pytest.mark.parametrize("datos", [{}, {"id": ""}, {"id": "abc"}, {"id": 0}, {"id": True}])
+def test_payphone_exige_el_id_del_retorno(
+    client: Client, settings: Any, datos: dict[str, Any]
+) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    compra, _ = iniciar_payphone(client, cabecera)
+    with patch(RUTA_PAYPHONE) as llamada:
+        respuesta = post(
+            client,
+            "confirmar",
+            {"compra_id": compra["compra_id"], "datos_pasarela": datos},
+            cabecera,
+        )
+    assert respuesta.status_code == 422
+    assert respuesta.json()["campo"] == "datos_pasarela"
+    llamada.assert_not_called()
+    assert PaymentTransaction.objects.get().status == PaymentTransaction.STATUS_PENDING
+
+
+def test_payphone_transaccion_inexistente_deja_la_compra_pendiente(
+    client: Client, settings: Any
+) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    compra, _ = iniciar_payphone(client, cabecera)
+    respuesta, _ = confirmar_payphone(
+        client,
+        cabecera,
+        compra["compra_id"],
+        {"message": "Transacción no encontrada", "errorCode": 20},
+        estado_http=400,
+    )
+    assert respuesta.status_code == 422
+    assert "no encontrada" in respuesta.json()["detail"]
+    assert PaymentTransaction.objects.get().status == PaymentTransaction.STATUS_PENDING
+
+
+@pytest.mark.parametrize(
+    "fallo",
+    [
+        {"side_effect": requests.ConnectionError},
+        {"return_value": respuesta_http({"message": "token"}, 401)},
+        {"return_value": respuesta_http({}, 500)},
+        {"return_value": respuesta_http("texto plano")},
+    ],
+    ids=["sin-red", "token-invalido", "error-interno", "sin-json"],
+)
+def test_si_payphone_falla_al_preparar_responde_503_sin_compra(
+    client: Client, settings: Any, fallo: dict[str, Any]
+) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    with patch(RUTA_PAYPHONE, **fallo):
+        respuesta = post(
+            client, "checkout", {"paquete_id": paquete().id, "pasarela": "payphone"}, cabecera
+        )
+    assert respuesta.status_code == 503
+    assert not PaymentTransaction.objects.exists()
+
+
+def test_payphone_sin_url_de_pago_responde_503(client: Client, settings: Any) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    with patch(RUTA_PAYPHONE, return_value=respuesta_http({"paymentId": "x"})):
+        respuesta = post(
+            client, "checkout", {"paquete_id": paquete().id, "pasarela": "payphone"}, cabecera
+        )
+    assert respuesta.status_code == 503
+
+
+@pytest.mark.parametrize("falta", ["PAYPHONE_TOKEN", "PAYPHONE_STORE_ID"])
+def test_payphone_sin_credenciales_responde_503_sin_llamar(
+    client: Client, settings: Any, falta: str
+) -> None:
+    payphone_real(settings)
+    setattr(settings, falta, "")
+    _, cabecera = cuenta()
+    with patch(RUTA_PAYPHONE) as llamada:
+        respuesta = post(
+            client, "checkout", {"paquete_id": paquete().id, "pasarela": "payphone"}, cabecera
+        )
+    assert respuesta.status_code == 503
+    assert respuesta.json()["detail"] == "PayPhone no está configurado."
+    llamada.assert_not_called()
+
+
+def test_payphone_real_no_vuelve_real_a_paypal(client: Client, settings: Any) -> None:
+    payphone_real(settings)
+    _, cabecera = cuenta()
+    compra = iniciar(client, cabecera)
+    assert compra["url_pago"].startswith("https://pasarela.falsa/")
 
 
 def test_lee_los_montos_de_cada_pasarela() -> None:
     assert monto_paypal(captura("4.50")) == Dinero(450)
     assert monto_paypal({}) is None
-    assert monto_payphone({"amount": 450}) == Dinero(450)
-    assert monto_payphone({}) is None
+    assert monto({"amount": 450}) == Dinero(450)
+    assert monto({"amount": "abc"}) is None
+    assert monto({}) is None

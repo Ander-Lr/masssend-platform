@@ -8,6 +8,7 @@ backend/.env
 backend/.env.gmail
 backend/.env.google
 backend/.env.paypal
+backend/.env.payphone
 /.env
 /.env.*
 !/.env.example
