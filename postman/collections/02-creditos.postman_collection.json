@@ -31,7 +31,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correo', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "}",
                   "pm.environment.set('correosVistos', 0);",
                   "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
                   "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
@@ -111,7 +119,7 @@
                   "    pm.environment.set('codigo', v);",
                   "  });",
                   "});",
-                  "leer(40);"
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
                 ]
               }
             }
@@ -644,7 +652,13 @@
                   "pm.test(\"Se ignora el monto del cliente\", () => pm.expect(c.monto).to.eql(pm.environment.get(\"paquetePrecio\")));",
                   "pm.test(\"Se ignoran los creditos del cliente\", () => pm.expect(c.creditos).to.eql(pm.environment.get(\"paqueteCreditos\")));",
                   "pm.test(\"El id es UUIDv7\", () => pm.expect(c.compra_id[14]).to.eql(\"7\"));",
-                  "pm.environment.set('compraId', c.compra_id);"
+                  "pm.environment.set('compraId', c.compra_id);",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  pm.test(\"Lleva a PayPal Sandbox\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/www\\.sandbox\\.paypal\\.com\\//));",
+                  "  console.log('Modo paypal: abre esta URL, paga con tu cuenta personal de Sandbox y luego ejecuta Confirmar: ' + c.url_pago);",
+                  "} else {",
+                  "  pm.test(\"Usa la pasarela simulada\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/pasarela\\.falsa\\//));",
+                  "}"
                 ]
               }
             }
@@ -682,6 +696,19 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PayPal real no acepta respuestas simuladas en datos_pasarela.",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: este paso solo aplica a la pasarela simulada.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -726,6 +753,19 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// PayPal real no acepta respuestas simuladas en datos_pasarela.",
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: este paso solo aplica a la pasarela simulada.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -806,6 +846,17 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('modoPago') === 'paypal') {",
+                  "  console.log('Modo paypal: si aun no pagaste en el navegador, la compra queda rechazada; paga y vuelve a confirmar.');",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {

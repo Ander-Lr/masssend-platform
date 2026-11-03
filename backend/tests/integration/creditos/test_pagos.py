@@ -215,6 +215,25 @@ def respuesta_http(cuerpo: dict[str, Any], estado: int = 200) -> MagicMock:
 def paypal_real(settings: Any) -> None:
     settings.PASARELA_PAGO_FAKE = False
     settings.PAYPAL_BASE_URL = "https://paypal.prueba"
+    settings.PAYPAL_CLIENT_ID = "cliente"
+    settings.PAYPAL_CLIENT_SECRET = "secreto-de-prueba"
+
+
+@pytest.mark.parametrize("falta", ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"])
+def test_paypal_sin_credenciales_responde_503_sin_crear_compra(
+    client: Client, settings: Any, falta: str
+) -> None:
+    paypal_real(settings)
+    setattr(settings, falta, "")
+    _, cabecera = cuenta()
+    with patch(RUTA) as llamada:
+        respuesta = post(
+            client, "checkout", {"paquete_id": paquete().id, "pasarela": "paypal"}, cabecera
+        )
+    assert respuesta.status_code == 503
+    assert respuesta.json()["codigo"] == "servicio_no_disponible"
+    llamada.assert_not_called()
+    assert not PaymentTransaction.objects.exists()
 
 
 RUTA = "billing.services.gateways.paypal_gateway.requests.post"

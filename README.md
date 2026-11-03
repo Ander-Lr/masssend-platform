@@ -68,11 +68,49 @@ La API se publica en `/api/v1/`. Para probarla en Postman sin WhatsApp, pagos ni
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci up --build -d
 ```
 
+O, en un solo paso, con todas las integraciones reales que tengas configuradas (Gmail, Google, PayPal y las que se agreguen):
+
+```bash
+./levantar.sh            # --limpio empieza de cero, --ia agrega Ollama, --apagar detiene todo
+```
+
+El script carga cada `backend/.env.<nombre>` que tenga su plantilla `.example` y sus valores completos, e indica qué variables cambiar en Postman.
+
 Importa `postman/environments/local.postman_environment.json` y las colecciones de `postman/collections/`. Los archivos de muestra están en `postman/archivos/`. La colección 05 corre una vez por arranque del perfil, porque activa el doble factor de la cuenta staff. Los correos capturados se ven en http://localhost:8025. Para apagar y borrar los datos de prueba:
 
 ```bash
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci down -v
 ```
+
+### Correos reales con Gmail
+
+Por defecto los correos del perfil `ci` quedan en Mailpit. Para recibirlos en Gmail, copia `backend/.env.gmail.example` como `backend/.env.gmail`, completa tu cuenta y una contraseña de aplicación, y agrega ese archivo al comando:
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend/.env.gmail --profile ci up --build -d --wait
+```
+
+En el entorno de Postman cambia `modoCorreo` a `gmail` y escribe tu correo en `correoReal`. Los códigos se copian desde tu bandeja.
+
+### Acceso con Google real
+
+Por defecto el perfil `ci` usa un Google falso. Para entrar con tu cuenta de Google, crea en Google Cloud un ID de cliente OAuth de tipo *Aplicación web* con la URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback`. Copia `backend/.env.google.example` como `backend/.env.google`, pega el ID y el secreto, y agrega ese archivo al comando (se puede combinar con `backend/.env.gmail`):
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend/.env.google --profile ci up --build -d --wait
+```
+
+En el entorno de Postman cambia `modoGoogle` a `google`. **Iniciar Google** devuelve una URL: ábrela en el navegador antes de 10 minutos y elige tu cuenta. El navegador muestra el siguiente paso y un `token_desafio`, con el que se continúa el doble factor en Postman. **Completar Google** se omite en este modo, porque Google entrega el código al navegador.
+
+### Pagos con PayPal Sandbox
+
+Por defecto los pagos del perfil `ci` se simulan. Para usar PayPal Sandbox (API real, dinero ficticio), crea una app en https://developer.paypal.com en modo Sandbox. Copia `backend/.env.paypal.example` como `backend/.env.paypal`, pega el Client ID y el Secret, y agrega ese archivo al comando:
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend/.env.paypal --profile ci up --build -d --wait
+```
+
+En el entorno de Postman cambia `modoPago` a `paypal`. **Checkout** devuelve la URL de PayPal: ábrela, paga con la cuenta *Personal* de Sandbox y luego ejecuta **Confirmar**. Al terminar, PayPal redirige a `localhost:5173`; mientras no exista el frontend, esa página no carga y no afecta al pago. **Pago rechazado** y **Cobro por otro monto** se omiten en este modo, porque PayPal no acepta respuestas simuladas.
 
 ## Estructura
 

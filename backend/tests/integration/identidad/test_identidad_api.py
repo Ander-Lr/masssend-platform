@@ -422,9 +422,15 @@ def test_google_borra_la_contrasena_de_una_cuenta_pendiente_ajena(client: Client
     es_problema(login(client, "ana@google.prueba"), 401, "no_autenticado")
 
 
-def test_la_url_real_de_google_lleva_el_estado_y_el_retorno(client: Client, settings: Any) -> None:
+@pytest.fixture
+def google_real(settings: Any) -> None:
     settings.PROVEEDOR_GOOGLE = "google"
     settings.GOOGLE_CLIENT_ID = "cliente"
+    settings.GOOGLE_CLIENT_SECRET = "secreto-de-prueba"
+
+
+@pytest.mark.usefixtures("google_real")
+def test_la_url_real_de_google_lleva_el_estado_y_el_retorno(client: Client, settings: Any) -> None:
     url = urlparse(client.get("/api/v1/auth/google").json()["url"])
     consulta = parse_qs(url.query)
     assert url.netloc == "accounts.google.com"
@@ -433,10 +439,10 @@ def test_la_url_real_de_google_lleva_el_estado_y_el_retorno(client: Client, sett
     assert consulta["state"]
 
 
-def test_si_google_falla_responde_503(client: Client, settings: Any) -> None:
+@pytest.mark.usefixtures("google_real")
+def test_si_google_falla_responde_503(client: Client) -> None:
     import requests as biblioteca
 
-    settings.PROVEEDOR_GOOGLE = "google"
     url = client.get("/api/v1/auth/google").json()["url"]
     estado = parse_qs(urlparse(url).query)["state"][0]
     ruta = "masssend.infrastructure.adapters.google.oauth.requests.post"
@@ -445,6 +451,15 @@ def test_si_google_falla_responde_503(client: Client, settings: Any) -> None:
             "/api/v1/auth/google/callback", {"state": estado, "code": "x"}
         )
     es_problema(respuesta, 503, "servicio_no_disponible")
+
+
+@pytest.mark.parametrize("falta", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"])
+@pytest.mark.usefixtures("google_real")
+def test_google_real_sin_credenciales_responde_503(
+    client: Client, settings: Any, falta: str
+) -> None:
+    setattr(settings, falta, "")
+    es_problema(client.get("/api/v1/auth/google"), 503, "servicio_no_disponible")
 
 
 def test_un_administrador_existente_entra_por_su_usuario(client: Client) -> None:

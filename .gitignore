@@ -5,6 +5,9 @@ backend/**/__pycache__/
 backend/**/*.pyc
 backend/**/*.pyo
 backend/.env
+backend/.env.gmail
+backend/.env.google
+backend/.env.paypal
 /.env
 /.env.*
 !/.env.example

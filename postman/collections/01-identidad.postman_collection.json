@@ -188,7 +188,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correo', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "}",
                   "pm.environment.set('correosVistos', 0);",
                   "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
                   "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
@@ -268,7 +276,7 @@
                   "    pm.environment.set('codigo', v);",
                   "  });",
                   "});",
-                  "leer(40);"
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
                 ]
               }
             }
@@ -446,7 +454,7 @@
                   "    pm.environment.set('codigo', v);",
                   "  });",
                   "});",
-                  "leer(40);"
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
                 ]
               }
             }
@@ -1243,7 +1251,17 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
-                  "pm.environment.set('estadoGoogle', pm.response.json().url.split('state=')[1]);"
+                  "const url = pm.response.json().url;",
+                  "// El state puede no ser el ultimo parametro: Google real agrega prompt=select_account.",
+                  "const estado = (url.match(/[?&]state=([^&]+)/) || [])[1] || '';",
+                  "pm.test(\"La URL lleva el estado\", () => pm.expect(estado).to.not.be.empty);",
+                  "pm.environment.set('estadoGoogle', decodeURIComponent(estado));",
+                  "if (pm.environment.get('modoGoogle') === 'google') {",
+                  "  pm.test(\"Apunta a Google real\", () => pm.expect(url).to.match(/^https:\\/\\/accounts\\.google\\.com\\//));",
+                  "  console.log('Modo google: abre esta URL en el navegador antes de 10 minutos: ' + url);",
+                  "} else {",
+                  "  pm.test(\"Usa el Google falso\", () => pm.expect(url).to.match(/^https:\\/\\/google\\.falso\\//));",
+                  "}"
                 ]
               }
             }
@@ -1322,6 +1340,19 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Con Google real, Google entrega el code al navegador, no a Postman.",
+                  "if (pm.environment.get('modoGoogle') === 'google') {",
+                  "  console.log('Modo google: este paso se completa en el navegador con la URL de Iniciar Google.');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -1743,7 +1774,7 @@
                   "    pm.environment.set('tokenRecuperacion', v);",
                   "  });",
                   "});",
-                  "leer(40);"
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
                 ]
               }
             }

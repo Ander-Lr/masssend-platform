@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import requests
+from django.conf import settings
 
 from billing.services.gateways.base import PaymentGateway
 from billing.services.gateways.paypal_gateway import PayPalGateway
@@ -83,6 +84,9 @@ class PasarelaHeredada:
 
 
 def paypal() -> PasarelaHeredada:
+    if not (settings.PAYPAL_CLIENT_ID and settings.PAYPAL_CLIENT_SECRET):
+        # Sin credenciales PayPal responde 401 y el error no diria la causa.
+        raise ServicioNoDisponible("PayPal no está configurado.")
     return PasarelaHeredada(PayPalGateway(), monto_paypal)
 
 

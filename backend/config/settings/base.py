@@ -50,6 +50,11 @@ if DESTINO_CORREO == "mailpit":
     EMAIL_HOST_PASSWORD = ""
     DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+if DESTINO_CORREO == "gmail" and os.environ.get("DESTINO_CORREO") and not (
+    EMAIL_HOST_USER and EMAIL_HOST_PASSWORD  # noqa: F405
+):
+    raise ImproperlyConfigured("DESTINO_CORREO=gmail exige EMAIL_USER y EMAIL_APP_PASSWORD.")
+
 # Sin Redis se usa la cache en memoria del proceso.
 REDIS_URL = os.environ.get("REDIS_URL")
 if REDIS_URL:
