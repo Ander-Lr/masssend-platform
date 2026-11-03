@@ -1,0 +1,3750 @@
+{
+  "info": {
+    "name": "03 Contactos y campanas",
+    "description": "Contactos y campanas de la v1: alta, edicion, filtros, paginacion, etiquetas, importacion CSV por lotes, campanas en borrador con sus destinatarios, adjuntos validados por contenido y aislamiento entre dos usuarios. Crea sus propias cuentas A y B, asi que corre sola contra el perfil ci. Los archivos de muestra estan en postman/archivos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Preparar sesion A",
+      "item": [
+        {
+          "name": "Cuenta de prueba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correo', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "}",
+                  "pm.environment.set('correosVistos', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Ana Lara\", \"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigo', v);",
+                  "  });",
+                  "});",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"codigo\": \"{{codigo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secreto', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar y obtener tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Preparar sesion B",
+      "item": [
+        {
+          "name": "Cuenta de prueba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correoB', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correoB', 'luis' + Date.now() + '@prueba.local');",
+                  "}",
+                  "pm.environment.set('correosVistosB', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Luis Mora\", \"correo\": \"{{correoB}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correoB');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistosB') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistosB', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigoB', v);",
+                  "  });",
+                  "});",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correoB}}\", \"codigo\": \"{{codigoB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correoB}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafioB', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafioB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secretoB', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar y obtener tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafioB}}\", \"codigo\": \"{{codigoTotpB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotpB', totp(pm.environment.get('secretoB'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('accesoB', t.acceso);",
+                  "pm.environment.set('renovacionB', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contactos",
+      "item": [
+        {
+          "name": "Crear contacto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"099 111-2222\", \"nombre\": \"Pedro Perez\", \"etiquetas\": \"vip, cliente,vip\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(c.id[14]).to.eql(\"7\"));",
+                  "pm.test(\"Normaliza el telefono\", () => pm.expect(c.telefono).to.eql(\"593991112222\"));",
+                  "pm.test(\"Limpia las etiquetas\", () => pm.expect(c.etiquetas).to.eql([\"vip\", \"cliente\"]));",
+                  "pm.environment.set('contactoId', c.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mismo numero actualiza",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"+593 99 111 2222\", \"nombre\": \"Pedro Perez\", \"etiquetas\": [\"vip\", \"cliente\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No duplica\", () => pm.expect(pm.response.json().id).to.eql(pm.environment.get(\"contactoId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telefono fijo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"022345678\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo telefono\", () => pm.expect(pm.response.json().campo).to.eql(\"telefono\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Telefono vacio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Sin numero\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver contacto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es el contacto\", () => pm.expect(pm.response.json().nombre).to.eql(\"Pedro Perez\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar contacto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"etiquetas\": [\"lead\", \"vip\"], \"datos\": {\"ciudad\": \"Quito\"}, \"dado_de_baja\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Cambia las etiquetas\", () => pm.expect(c.etiquetas).to.eql([\"lead\", \"vip\"]));",
+                  "pm.test(\"Guarda los datos\", () => pm.expect(c.datos.ciudad).to.eql(\"Quito\"));",
+                  "pm.test(\"Queda de baja\", () => pm.expect(c.dado_de_baja).to.eql(true));",
+                  "pm.test(\"Conserva el nombre\", () => pm.expect(c.nombre).to.eql(\"Pedro Perez\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reactivar contacto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dado_de_baja\": false}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Vuelve a recibir\", () => pm.expect(pm.response.json().dado_de_baja).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar con datos invalidos",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear segundo contacto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0992223333\", \"nombre\": \"Maria Lopez\", \"etiquetas\": [\"cliente\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('contactoId2', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar contactos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Trae los dos\", () => pm.expect(r.datos.length).to.eql(2));",
+                  "pm.test(\"El mas nuevo primero\", () => pm.expect(r.datos[0].id).to.eql(pm.environment.get(\"contactoId2\")));",
+                  "pm.test(\"Informa la pagina\", () => pm.expect(r.pagina.tiene_mas).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paginar de a uno",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?limite=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Trae uno\", () => pm.expect(r.datos.length).to.eql(1));",
+                  "pm.test(\"Hay mas\", () => pm.expect(r.pagina.tiene_mas).to.eql(true));",
+                  "pm.environment.set('cursorContactos', r.pagina.siguiente_cursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Segunda pagina",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?limite=1&cursor={{cursorContactos}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "1"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{cursorContactos}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Trae el mas antiguo\", () => pm.expect(r.datos[0].id).to.eql(pm.environment.get(\"contactoId\")));",
+                  "pm.test(\"No hay mas\", () => pm.expect(r.pagina.tiene_mas).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por etiqueta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?etiqueta=lead",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "etiqueta",
+                  "value": "lead"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Solo los lead\", () => pm.expect(r.datos.map(c => c.id)).to.eql([pm.environment.get(\"contactoId\")]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar por texto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?texto=maria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "texto",
+                  "value": "maria"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Encuentra a Maria\", () => pm.expect(pm.response.json().datos.map(c => c.nombre)).to.eql([\"Maria Lopez\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Etiquetas propias",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/etiquetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "etiquetas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Sin repetir y en orden\", () => pm.expect(pm.response.json().datos).to.eql([\"cliente\", \"lead\", \"vip\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Limite excedido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?limite=101",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "101"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo limite\", () => pm.expect(pm.response.json().campo).to.eql(\"limite\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cursor manipulado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?cursor=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "abc"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo cursor\", () => pm.expect(pm.response.json().campo).to.eql(\"cursor\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Id mal formado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/no-es-un-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "no-es-un-id"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear sin token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0991112222\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Aislamiento entre usuarios",
+      "description": "El usuario B nunca ve ni toca los contactos de A: para el, no existen.",
+      "item": [
+        {
+          "name": "B ve un contacto de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B edita un contacto de A",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Robado\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B elimina un contacto de A",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no ve contactos de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista vacia\", () => pm.expect(pm.response.json().datos).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no ve etiquetas de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/etiquetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "etiquetas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Sin etiquetas\", () => pm.expect(pm.response.json().datos).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B puede tener el mismo numero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0991112222\", \"nombre\": \"Contacto de B\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Es otro contacto\", () => pm.expect(pm.response.json().id).to.not.eql(pm.environment.get(\"contactoId\")));",
+                  "pm.environment.set('contactoB', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A conserva su contacto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Sin cambios de B\", () => pm.expect(pm.response.json().nombre).to.eql(\"Pedro Perez\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Campanas",
+      "description": "Borradores, destinatarios por etiqueta, filtros y aislamiento entre usuarios.",
+      "item": [
+        {
+          "name": "Crear campana",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Promo de noviembre\", \"mensaje\": \"Hola {{nombre}}, tenemos 20% de descuento\", \"etiquetas\": [\"vip\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(c.id[14]).to.eql(\"7\"));",
+                  "pm.test(\"Nace como borrador\", () => pm.expect(c.estado).to.eql(\"borrador\"));",
+                  "pm.test(\"Cuenta sus destinatarios\", () => pm.expect(c.destinatarios).to.eql(1));",
+                  "pm.test(\"Sin adjunto\", () => pm.expect(c.tiene_adjunto).to.eql(false));",
+                  "pm.environment.set('campanaId', c.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear sin nombre",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"\", \"mensaje\": \"Hola\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo nombre\", () => pm.expect(pm.response.json().campo).to.eql(\"nombre\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear sin mensaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Promo\", \"mensaje\": \"  \"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo mensaje\", () => pm.expect(pm.response.json().campo).to.eql(\"mensaje\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver campana",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Conserva la plantilla\", () => pm.expect(c.mensaje).to.include(\"{{nombre}}\"));",
+                  "pm.test(\"Etiquetas objetivo\", () => pm.expect(c.etiquetas).to.eql([\"vip\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar borrador",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"etiquetas\": [], \"mensaje\": \"Hola {{nombre}}, tenemos 30% de descuento\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Sin etiquetas llega a todos\", () => pm.expect(c.destinatarios).to.eql(2));",
+                  "pm.test(\"Conserva el nombre\", () => pm.expect(c.nombre).to.eql(\"Promo de noviembre\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar con datos invalidos",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \" \"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo nombre\", () => pm.expect(pm.response.json().campo).to.eql(\"nombre\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear segunda campana",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Recordatorio\", \"mensaje\": \"Hola {{nombre}}\", \"etiquetas\": \"cliente\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('campanaId2', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar campanas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Trae las dos, la mas nueva primero\", () => pm.expect(r.datos.map(c => c.id)).to.eql([pm.environment.get(\"campanaId2\"), pm.environment.get(\"campanaId\")]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtrar por estado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas?estado=borrador",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "borrador"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Las dos son borrador\", () => pm.expect(pm.response.json().datos.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ninguna completada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas?estado=completada",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "completada"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista vacia\", () => pm.expect(pm.response.json().datos).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado desconocido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas?estado=pausada",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "pausada"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo estado\", () => pm.expect(pm.response.json().campo).to.eql(\"estado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Id mal formado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/no-es-un-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "no-es-un-id"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B ve una campana de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B edita una campana de A",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Robada\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B elimina una campana de A",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no ve campanas de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista vacia\", () => pm.expect(pm.response.json().datos).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campanas sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Adjuntos",
+      "description": "El tipo se comprueba por el contenido: un PNG renombrado como MP4 responde 422.",
+      "item": [
+        {
+          "name": "Descargar sin adjunto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PNG renombrado como MP4",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/png-renombrado.mp4"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo archivo\", () => pm.expect(pm.response.json().campo).to.eql(\"archivo\"));",
+                  "pm.test(\"Explica el motivo\", () => pm.expect(pm.response.json().detail).to.include(\"no coincide\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Archivo que no es imagen ni video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/prueba.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo archivo\", () => pm.expect(pm.response.json().campo).to.eql(\"archivo\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subir sin archivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "otro",
+                  "value": "x",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subir imagen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/promo.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"Queda con adjunto\", () => pm.expect(c.tiene_adjunto).to.eql(true));",
+                  "pm.test(\"Se descarga por la API\", () => pm.expect(c.adjunto_url).to.eql(\"/api/v1/campanas/\" + c.id + \"/adjunto\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Descargar imagen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es PNG\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"image/png\"));",
+                  "pm.test(\"No se cachea\", () => pm.expect(pm.response.headers.get(\"Cache-Control\")).to.include(\"no-store\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reemplazar por video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/video.mp4"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Descargar video",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es MP4\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"video/mp4\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B descarga el adjunto de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B sube un adjunto a la campana de A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/promo.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Descargar sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId}}",
+                "adjunto"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar campana",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId2}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campana eliminada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaId2}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Importacion CSV",
+      "item": [
+        {
+          "name": "Importar con encabezado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Crea los nuevos\", () => pm.expect(r.creados).to.eql(3));",
+                  "pm.test(\"Actualiza el existente y el repetido\", () => pm.expect(r.actualizados).to.eql(2));",
+                  "pm.test(\"Informa las rechazadas\", () => pm.expect(r.total_rechazadas).to.eql(3));",
+                  "pm.test(\"Con su fila\", () => pm.expect(r.rechazadas.map(f => f.fila)).to.eql([4, 5, 6]));",
+                  "pm.test(\"Y su motivo\", () => pm.expect(r.rechazadas[0].mensaje).to.include(\"fijo\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Importar sin encabezado con punto y coma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos-sin-encabezado.csv"
+                },
+                {
+                  "key": "separador",
+                  "value": ";",
+                  "type": "text"
+                },
+                {
+                  "key": "encabezado",
+                  "value": "false",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Crea los dos\", () => pm.expect(pm.response.json().creados).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Importar 10000 filas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos-10000.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Crea las 10000\", () => pm.expect(r.creados).to.eql(10000));",
+                  "pm.test(\"Sin rechazadas\", () => pm.expect(r.total_rechazadas).to.eql(0));",
+                  "pm.test(\"Termina en menos de 30 s\", () => pm.expect(pm.response.responseTime).to.be.below(30000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reimportar 10000 filas no duplica",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos-10000.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"No crea ninguno\", () => pm.expect(r.creados).to.eql(0));",
+                  "pm.test(\"Actualiza las 10000\", () => pm.expect(r.actualizados).to.eql(10000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Las 10000 quedan paginadas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos?limite=100&etiqueta=masivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "100"
+                },
+                {
+                  "key": "etiqueta",
+                  "value": "masivo"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Maximo 100 por pagina\", () => pm.expect(r.datos.length).to.eql(100));",
+                  "pm.test(\"Hay mas\", () => pm.expect(r.pagina.tiene_mas).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no recibe la importacion de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Solo su contacto\", () => pm.expect(pm.response.json().datos.length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Archivo sin columna telefono",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos-sin-telefono.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo archivo\", () => pm.expect(pm.response.json().campo).to.eql(\"archivo\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Archivo que no es CSV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/prueba.pdf"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo archivo\", () => pm.expect(pm.response.json().campo).to.eql(\"archivo\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Separador no soportado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos.csv"
+                },
+                {
+                  "key": "separador",
+                  "value": "#",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo separador\", () => pm.expect(pm.response.json().campo).to.eql(\"separador\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Importar sin archivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "separador",
+                  "value": ",",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Importar sin token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Eliminacion",
+      "item": [
+        {
+          "name": "Eliminar en lote ignora lo ajeno",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": [\"{{contactoId2}}\", \"{{contactoB}}\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Solo borra el propio\", () => pm.expect(pm.response.json().eliminados).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B conserva su contacto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoB}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoB}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar en lote sin ids",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": []}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo ids\", () => pm.expect(pm.response.json().campo).to.eql(\"ids\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar en lote con id invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": [\"abc\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo ids\", () => pm.expect(pm.response.json().campo).to.eql(\"ids\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar contacto",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ya no existe",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar otra vez",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{contactoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{contactoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

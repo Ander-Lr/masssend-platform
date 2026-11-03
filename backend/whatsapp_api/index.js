@@ -11,6 +11,7 @@ const qrcode = require('qrcode-terminal');
 const P = require('pino');
 const fs = require('fs');
 const http = require('http');
+const { createHmac } = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const app = express();
@@ -60,20 +61,50 @@ const sendQueue = [];
 let queueRunning = false;
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ─── Notificar a Django ───────────────────────────────────────────────
-async function notifyDjango(path, body) {
-    try {
-        const djangoUrl = (process.env.DJANGO_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-        const webhookToken = process.env.WHATSAPP_WEBHOOK_TOKEN || '';
-        await fetch(`${djangoUrl}${path}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${webhookToken}`
-            },
-            body: JSON.stringify(body)
-        });
-    } catch (e) { /* Django no disponible */ }
+// ─── Notificar a Django (webhooks firmados de la API v1) ───────────────
+// Cada aviso lleva X-MassSend-Tiempo y X-MassSend-Firma: HMAC-SHA256 del
+// texto "<tiempo>.<cuerpo>" con WHATSAPP_WEBHOOK_TOKEN. Django rechaza con
+// 401 una firma inválida o un aviso de más de 5 minutos, así que un aviso
+// capturado no se puede repetir ni alterar. Los webhooks son idempotentes:
+// si Django no responde, se reintenta sin riesgo de duplicar nada.
+const WEBHOOKS = {
+    mensajes: '/api/v1/webhooks/whatsapp/mensajes',
+    acuses: '/api/v1/webhooks/whatsapp/acuses',
+    resultados: '/api/v1/webhooks/whatsapp/resultados',
+};
+
+function firmar(cuerpo, tiempo, secreto) {
+    return 'sha256=' + createHmac('sha256', secreto).update(`${tiempo}.${cuerpo}`).digest('hex');
+}
+
+async function notifyDjango(path, body, intentos = 3) {
+    const djangoUrl = (process.env.DJANGO_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const secreto = process.env.WHATSAPP_WEBHOOK_TOKEN || '';
+    if (!secreto) {
+        console.error('[Webhook] Falta WHATSAPP_WEBHOOK_TOKEN: Django rechazará el aviso.');
+    }
+    const cuerpo = JSON.stringify(body);
+    for (let intento = 1; intento <= intentos; intento++) {
+        const tiempo = Math.floor(Date.now() / 1000).toString();
+        try {
+            const resp = await fetch(`${djangoUrl}${path}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-MassSend-Tiempo': tiempo,
+                    'X-MassSend-Firma': firmar(cuerpo, tiempo, secreto),
+                },
+                body: cuerpo,
+            });
+            // 4xx no se reintenta: el aviso está mal o la firma no coincide.
+            if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
+                if (!resp.ok) console.error(`[Webhook] ${path} respondió ${resp.status}.`);
+                return;
+            }
+        } catch (e) { /* Django no disponible: se reintenta */ }
+        await sleep(1000 * intento);
+    }
+    console.error(`[Webhook] ${path} no respondió tras ${intentos} intentos.`);
 }
 
 // ─── Programar reconexión (única) ─────────────────────────────────────
@@ -189,7 +220,7 @@ async function startClient() {
                 if (!body) continue;
 
                 console.log(`[WhatsApp] Mensaje entrante de ${number}: ${body.substring(0, 60)}`);
-                await notifyDjango('/whatsapp/api/webhook/', { from: number, body, type: 'chat' });
+                await notifyDjango(WEBHOOKS.mensajes, { id: msg.key.id || null, telefono: number, texto: body });
                 // Notificar a React via WebSocket: nuevo mensaje entrante (push instantáneo)
                 // Esto reemplaza el polling cada 3s por un evento puntual y eficiente
                 broadcast('new_message', { from: number, body, direction: 'inbound' });
@@ -209,12 +240,14 @@ async function startClient() {
 
                 // WAMessageStatus: 2=SERVER_ACK, 3=DELIVERY_ACK, 4=READ, 5=PLAYED
                 const statusMap = { 2: 'sent', 3: 'delivered', 4: 'read', 5: 'read' };
+                const estadoV1 = { sent: 'enviado', delivered: 'entregado', read: 'leido' };
                 const status = statusMap[statusNum];
-                if (!status) continue;
+                if (!status || !update.key.id) continue;
 
-                await notifyDjango('/whatsapp/api/message-ack/', {
-                    wpp_message_id: update.key.id || null,
-                    number, status
+                await notifyDjango(WEBHOOKS.acuses, {
+                    id_externo: update.key.id,
+                    telefono: number,
+                    estado: estadoV1[status],
                 });
                 // Notificar a React: estado del mensaje actualizado (ticks)
                 broadcast('message_ack', { wpp_message_id: update.key.id, number, status });
@@ -238,7 +271,7 @@ async function processSendQueue() {
 
     while (sendQueue.length > 0) {
         const task = sendQueue.shift();
-        const { cleanNumber, message, media_base64, media_mimetype, media_filename, media_url } = task;
+        const { cleanNumber, message, media_base64, media_mimetype, media_filename, media_url, envio_id } = task;
 
         if (!isReady || !sock) {
             console.log(`[Queue] WhatsApp no listo. Esperando 5s antes de reintentar ${cleanNumber}...`);
@@ -300,8 +333,10 @@ async function processSendQueue() {
 
             const wppId = msgResult?.key?.id || null;
             console.log(`[Queue] ✓ Enviado a ${cleanNumber} | id=${wppId}`);
-            await notifyDjango('/whatsapp/api/send-result/', {
-                number: cleanNumber, status: 'sent', wpp_message_id: wppId
+            // envio_id vuelve tal como llegó: así Django sabe a qué envío corresponde
+            // sin adivinar por el número. Es null para los mensajes del chat.
+            await notifyDjango(WEBHOOKS.resultados, {
+                envio_id: envio_id || null, telefono: cleanNumber, estado: 'enviado', id_externo: wppId
             });
             // Push a React: mensaje de campaña enviado exitosamente
             broadcast('campaign_msg_sent', { number: cleanNumber, status: 'sent', wpp_message_id: wppId });
@@ -309,8 +344,8 @@ async function processSendQueue() {
         } catch (err) {
             const errorMsg = err.message || String(err);
             console.error(`[Queue] ✗ Error enviando a ${cleanNumber}:`, errorMsg);
-            await notifyDjango('/whatsapp/api/send-result/', {
-                number: cleanNumber, status: 'failed', error: errorMsg
+            await notifyDjango(WEBHOOKS.resultados, {
+                envio_id: envio_id || null, telefono: cleanNumber, estado: 'fallido', error: errorMsg
             });
         }
 
@@ -329,12 +364,12 @@ app.post('/api/send', (req, res) => {
     if (!isReady) {
         return res.status(503).json({ success: false, error: 'WhatsApp no conectado. Escanea el QR.' });
     }
-    const { number, message, media_url, media_base64, media_mimetype, media_filename } = req.body;
+    const { number, message, media_url, media_base64, media_mimetype, media_filename, envio_id } = req.body;
     if (!number || !(message || media_url || media_base64)) {
         return res.status(400).json({ success: false, error: 'Faltan parametros: number y message o media son requeridos.' });
     }
     const cleanNumber = number.replace(/[^0-9]/g, '');
-    sendQueue.push({ cleanNumber, message, media_url, media_base64, media_mimetype, media_filename });
+    sendQueue.push({ cleanNumber, message, media_url, media_base64, media_mimetype, media_filename, envio_id });
     res.json({ success: true, status: 'queued', queue_size: sendQueue.length });
     processSendQueue();
 });

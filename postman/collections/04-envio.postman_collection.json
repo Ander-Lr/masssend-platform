@@ -1,0 +1,3346 @@
+{
+  "info": {
+    "name": "04 Envio",
+    "description": "Lanzamiento, progreso y cancelacion de campanas con el canal falso y la cola sincrona del perfil ci. Usa los creditos reales de la coleccion 02: reserva al lanzar, cobra cada mensaje que sale y devuelve lo que no se uso. Despues, los webhooks firmados del gateway (BAJA incluida), las rutas de WhatsApp para staff, el historial de mensajes y el reporte. Crea sus propias cuentas A y B, asi que corre sola.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Preparar sesion A",
+      "item": [
+        {
+          "name": "Cuenta de prueba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correo', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correo', 'ana' + Date.now() + '@prueba.local');",
+                  "}",
+                  "pm.environment.set('correosVistos', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Ana Lara\", \"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correo');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistos') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistos', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigo', v);",
+                  "  });",
+                  "});",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"codigo\": \"{{codigo}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correo}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafio', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secreto', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar y obtener tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafio}}\", \"codigo\": \"{{codigoTotp}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotp', totp(pm.environment.get('secreto'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('acceso', t.acceso);",
+                  "pm.environment.set('renovacion', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Preparar sesion B",
+      "item": [
+        {
+          "name": "Cuenta de prueba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Modo gmail: tucorreo+marca@gmail.com llega a tu misma bandeja y es una cuenta nueva.",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') {",
+                  "  const real = pm.environment.get('correoReal') || '';",
+                  "  if (!real.includes('@')) throw new Error('Define correoReal en el entorno MassSend local');",
+                  "  const [usuario, dominio] = real.split('@');",
+                  "  pm.environment.set('correoB', usuario + '+' + Date.now() + '@' + dominio);",
+                  "} else {",
+                  "  pm.environment.set('correoB', 'luis' + Date.now() + '@prueba.local');",
+                  "}",
+                  "pm.environment.set('correosVistosB', 0);",
+                  "// Calcula un TOTP (RFC 6238) a partir del secreto base32. Disponible en todas las peticiones.",
+                  "pm.globals.set('libTotp', `(function (secreto, desplazamiento) {",
+                  "  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                  "  let bits = '';",
+                  "  for (const c of secreto.replace(/=+$/, '').toUpperCase()) bits += abc.indexOf(c).toString(2).padStart(5, '0');",
+                  "  let hex = '';",
+                  "  for (let i = 0; i + 8 <= bits.length; i += 8) hex += parseInt(bits.substr(i, 8), 2).toString(16).padStart(2, '0');",
+                  "  const paso = Math.floor(Date.now() / 30000) + (desplazamiento || 0);",
+                  "  const msg = paso.toString(16).padStart(16, '0');",
+                  "  const h = CryptoJS.HmacSHA1(CryptoJS.enc.Hex.parse(msg), CryptoJS.enc.Hex.parse(hex)).toString();",
+                  "  const o = parseInt(h.substr(h.length - 1), 16);",
+                  "  const n = parseInt(h.substr(o * 2, 8), 16) & 0x7fffffff;",
+                  "  return String(n % 1000000).padStart(6, '0');",
+                  "})`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cuenta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Luis Mora\", \"correo\": \"{{correoB}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El id es UUIDv7\", () => pm.expect(pm.response.json().id[14]).to.eql(\"7\"));",
+                  "// Espera el correo en Mailpit y guarda codigo.",
+                  "const correo = pm.environment.get('correoB');",
+                  "const leer = (restantes) => pm.sendRequest({",
+                  "  url: pm.environment.get('mailpitUrl') + '/api/v1/search?query=' + encodeURIComponent('to:' + correo),",
+                  "}, (e, r) => {",
+                  "  const m = !e && r.json().messages || [];",
+                  "  const vistos = Number(pm.environment.get('correosVistosB') || 0);",
+                  "  const nuevo = m.length > vistos ? m[0] : null;",
+                  "  if (!nuevo) { if (restantes > 0) return setTimeout(() => leer(restantes - 1), 300); throw new Error('No llego el correo'); }",
+                  "  pm.environment.set('correosVistosB', m.length);",
+                  "  pm.sendRequest({ url: pm.environment.get('mailpitUrl') + '/api/v1/message/' + nuevo.ID }, (e2, r2) => {",
+                  "    const v = r2.json().Text.match(/\\b(\\d{6})\\b/)[1];",
+                  "    pm.environment.set('codigoB', v);",
+                  "  });",
+                  "});",
+                  "if (pm.environment.get('modoCorreo') === 'gmail') { console.log('Modo gmail: revisa tu bandeja y copia el valor en el entorno.'); } else { leer(40); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verificar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correoB}}\", \"codigo\": \"{{codigoB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primer login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"correo\": \"{{correoB}}\", \"contrasena\": \"clave-larga-123\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exige enrolarse\", () => pm.expect(pm.response.json().siguiente).to.eql(\"activar_mfa\"));",
+                  "pm.test(\"No entrega tokens\", () => pm.expect(pm.response.json()).to.not.have.property(\"acceso\"));",
+                  "pm.environment.set('desafioB', pm.response.json().token_desafio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activar doble factor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/activar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "activar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafioB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"Entrega el QR\", () => pm.expect(m.qr).to.include(\"data:image/png;base64,\"));",
+                  "pm.environment.set('secretoB', m.clave_manual);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar y obtener tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mfa/confirmar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mfa",
+                "confirmar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token_desafio\": \"{{desafioB}}\", \"codigo\": \"{{codigoTotpB}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const totp = eval(pm.globals.get('libTotp'));",
+                  "pm.environment.set('codigoTotpB', totp(pm.environment.get('secretoB'), 0));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.environment.set('accesoB', t.acceso);",
+                  "pm.environment.set('renovacionB', t.renovacion);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Preparar campana",
+      "description": "Tres contactos: uno normal, uno sin WhatsApp (termina en 0000, el canal falso lo rechaza) y uno que se dio de baja.",
+      "item": [
+        {
+          "name": "Contacto Pedro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0991112222\", \"nombre\": \"Pedro\", \"etiquetas\": \"envio\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('envioPedro', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contacto Sin WhatsApp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0992220000\", \"nombre\": \"Sin WhatsApp\", \"etiquetas\": \"envio\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('envioRechazado', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contacto Baja",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0993334444\", \"nombre\": \"Baja\", \"etiquetas\": \"envio\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('envioBaja', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dar de baja",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{envioBaja}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{envioBaja}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dado_de_baja\": true}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda de baja\", () => pm.expect(pm.response.json().dado_de_baja).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear campana",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Lanzamiento\", \"mensaje\": \"Hola {{nombre}}, gracias por preferirnos\", \"etiquetas\": [\"envio\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"La baja no cuenta como destinatario\", () => pm.expect(c.destinatarios).to.eql(2));",
+                  "pm.environment.set('campanaEnvio', c.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Adjuntar imagen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/adjunto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "adjunto"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/promo.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Saldo antes de lanzar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/saldo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test(\"Nada reservado\", () => pm.expect(s.reservado).to.eql(0));",
+                  "pm.environment.set('saldoInicial', s.saldo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Progreso de un borrador",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Sin envios todavia\", () => pm.expect([p.estado, p.total, p.porcentaje]).to.eql([\"borrador\", 0, 0]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lanzar",
+      "description": "Con la cola sincrona del perfil ci, la campana termina en la misma respuesta del lanzamiento.",
+      "item": [
+        {
+          "name": "Lanzar sin token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B lanza la campana de A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lanzar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 202\", () => pm.response.to.have.status(202));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Un envio por destinatario\", () => pm.expect(r.total).to.eql(2));",
+                  "pm.test(\"Enlace al progreso\", () => pm.expect(r.progreso_url).to.eql(\"/api/v1/campanas/\" + pm.environment.get(\"campanaEnvio\") + \"/progreso\"));",
+                  "pm.test(\"Location apunta al progreso\", () => pm.expect(pm.response.headers.get(\"Location\")).to.eql(r.progreso_url));",
+                  "pm.test(\"Estima la duracion con el ritmo de envio\", () => pm.expect(r.duracion_estimada_segundos).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Progreso completado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Campana completada\", () => pm.expect(p.estado).to.eql(\"completada\"));",
+                  "pm.test(\"Uno enviado y uno rechazado\", () => pm.expect([p.enviados, p.fallidos]).to.eql([1, 1]));",
+                  "pm.test(\"Nada pendiente\", () => pm.expect([p.pendientes, p.porcentaje]).to.eql([0, 100]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Se cobra solo lo que salio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/saldo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test(\"Descuenta un credito\", () => pm.expect(s.saldo).to.eql(pm.environment.get(\"saldoInicial\") - 1));",
+                  "pm.test(\"El credito del rechazado vuelve\", () => pm.expect(s.reservado).to.eql(0));",
+                  "pm.environment.set('saldoTrasEnvio', s.saldo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El consumo queda en movimientos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/movimientos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "movimientos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Hay un consumo\", () => pm.expect(pm.response.json().datos.filter(m => m.tipo === \"consumo\").length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lanzar otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar una campana lanzada",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Otra\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar una campana completada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "cancelar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B consulta el progreso de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Progreso sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Progreso de una campana inexistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/no-es-un-id/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "no-es-un-id",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sin saldo",
+      "description": "Veinte destinatarios con menos de veinte creditos: 402 y nada queda reservado.",
+      "item": [
+        {
+          "name": "Importar 20 contactos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/importar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "importar"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": "archivos/contactos-envio-20.csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Crea los 20\", () => pm.expect(pm.response.json().creados).to.eql(20));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campana para los 20",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Masiva\", \"mensaje\": \"Hola {{nombre}}\", \"etiquetas\": [\"lote\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Veinte destinatarios\", () => pm.expect(pm.response.json().destinatarios).to.eql(20));",
+                  "pm.environment.set('campanaGrande', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lanzar sin saldo suficiente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 402\", () => pm.response.to.have.status(402));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Informa lo requerido\", () => pm.expect(r.requerido).to.eql(20));",
+                  "pm.test(\"Informa lo disponible\", () => pm.expect(r.disponible).to.eql(pm.environment.get(\"saldoTrasEnvio\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sigue en borrador",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}/progreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}",
+                "progreso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Borrador sin envios\", () => pm.expect([pm.response.json().estado, pm.response.json().total]).to.eql([\"borrador\", 0]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No se reservo nada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/creditos/saldo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "creditos",
+                "saldo"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Saldo intacto\", () => pm.expect(pm.response.json().saldo).to.eql(pm.environment.get(\"saldoTrasEnvio\")));",
+                  "pm.test(\"Nada reservado\", () => pm.expect(pm.response.json().reservado).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cancelar",
+      "item": [
+        {
+          "name": "Cancelar un borrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}",
+                "cancelar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Queda cancelada\", () => pm.expect(r.estado).to.eql(\"cancelada\"));",
+                  "pm.test(\"No habia nada que liberar\", () => pm.expect([r.envios_cancelados, r.creditos_liberados]).to.eql([0, 0]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lanzar una campana cancelada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}",
+                "cancelar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B cancela una campana de A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaEnvio}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaEnvio}}",
+                "cancelar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar la cancelada",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaGrande}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaGrande}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campana sin destinatarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Vacia\", \"mensaje\": \"Hola\", \"etiquetas\": [\"nadie\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.environment.set('campanaVacia', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lanzar sin destinatarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campanas/{{campanaVacia}}/lanzar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "campanas",
+                "{{campanaVacia}}",
+                "lanzar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Webhooks y WhatsApp",
+      "description": "Avisos firmados del gateway. La firma usa la variable de coleccion webhookSecreto, que debe ser igual a WHATSAPP_WEBHOOK_TOKEN del servidor (solo-pruebas en el perfil ci).",
+      "item": [
+        {
+          "name": "Aviso sin firma",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Firma con otro secreto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, 'otro-secreto').toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aviso vencido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000) - 400);",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensaje entrante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('idEntrante', 'wa.' + Date.now());",
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Se registra\", () => pm.expect(pm.response.json()).to.eql({repetido: false, baja: false, contactos_dados_de_baja: 0}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El mismo mensaje otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idEntrante}}\", \"telefono\": \"593991112222\", \"texto\": \"Hola, quiero mas informacion\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No se duplica\", () => pm.expect(pm.response.json().repetido).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedro escribe BAJA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": \"{{idBaja}}\", \"telefono\": \"593991112222\", \"texto\": \"Baja\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('idBaja', 'wa.baja.' + Date.now());",
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Se reconoce la baja\", () => pm.expect(r.baja).to.eql(true));",
+                  "pm.test(\"Se da de baja en las libretas\", () => pm.expect(r.contactos_dados_de_baja).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedro queda de baja",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/contactos/{{envioPedro}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "contactos",
+                "{{envioPedro}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Ya no recibe campanas\", () => pm.expect(pm.response.json().dado_de_baja).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acuse de un mensaje desconocido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/acuses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "acuses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id_externo\": \"wamid.desconocido\", \"estado\": \"leido\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No cambia nada\", () => pm.expect(pm.response.json().actualizados).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resultado de un envio desconocido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/resultados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "resultados"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"envio_id\": \"{{campanaEnvio}}\", \"telefono\": \"593991112222\", \"estado\": \"enviado\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No cambia nada\", () => pm.expect(pm.response.json().actualizados).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acuse con estado invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/acuses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "acuses"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id_externo\": \"x\", \"estado\": \"visto\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resultado con envio_id invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/whatsapp/resultados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "whatsapp",
+                "resultados"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"envio_id\": \"abc\", \"telefono\": \"1\", \"estado\": \"enviado\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const cuerpo = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const tiempo = String(Math.floor(Date.now() / 1000));",
+                  "const firma = CryptoJS.HmacSHA256(tiempo + '.' + cuerpo, pm.collectionVariables.get('webhookSecreto')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Tiempo', value: tiempo });",
+                  "pm.request.headers.upsert({ key: 'X-MassSend-Firma', value: 'sha256=' + firma });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo envio_id\", () => pm.expect(pm.response.json().campo).to.eql(\"envio_id\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de WhatsApp sin ser staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "estado"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vincular sin ser staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/vinculacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "vinculacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefono\": \"0991112222\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar sesion sin ser staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/cerrar-sesion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "cerrar-sesion"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de WhatsApp sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/whatsapp/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "whatsapp",
+                "estado"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mensajes y reportes",
+      "description": "Historial de A tras el lanzamiento y los webhooks: dos salientes (uno rechazado) y dos entrantes de Pedro. Conversaciones y chat son solo para staff.",
+      "item": [
+        {
+          "name": "Mensajes propios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test(\"Dos salientes y dos entrantes\", () => pm.expect(d.length).to.eql(4));",
+                  "pm.test(\"El mas nuevo primero\", () => pm.expect(d[0].direccion).to.eql(\"entrante\"));",
+                  "pm.test(\"Con el nombre del contacto\", () => pm.expect(d.find(m => m.telefono === \"593991112222\").nombre).to.eql(\"Pedro\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solo salientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?direccion=saliente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "direccion",
+                  "value": "saliente"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Los dos de la campana\", () => pm.expect(pm.response.json().datos.every(m => m.campana === \"Lanzamiento\")).to.eql(true));",
+                  "pm.test(\"Son dos\", () => pm.expect(pm.response.json().datos.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solo fallidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?estado=fallido",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "fallido"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test(\"El numero sin WhatsApp\", () => pm.expect(d.map(m => m.telefono)).to.eql([\"593992220000\"]));",
+                  "pm.environment.set('mensajeFallido', d[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conversacion con Pedro",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?telefono=0991112222",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "telefono",
+                  "value": "0991112222"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"El telefono se normaliza\", () => pm.expect(pm.response.json().datos.length).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar por texto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?texto=Pedro&direccion=saliente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "texto",
+                  "value": "Pedro"
+                },
+                {
+                  "key": "direccion",
+                  "value": "saliente"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Encuentra el mensaje personalizado\", () => pm.expect(pm.response.json().datos.map(m => m.texto)).to.eql([\"Hola Pedro, gracias por preferirnos\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paginar mensajes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?limite=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Uno por pagina\", () => pm.expect(pm.response.json().datos.length).to.eql(1));",
+                  "pm.test(\"Hay mas\", () => pm.expect(pm.response.json().pagina.tiene_mas).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado desconocido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes?estado=visto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "visto"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo estado\", () => pm.expect(pm.response.json().campo).to.eql(\"estado\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no ve los mensajes de A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista vacia\", () => pm.expect(pm.response.json().datos).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B no puede borrar mensajes de A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accesoB}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": [\"{{mensajeFallido}}\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"No borra nada\", () => pm.expect(pm.response.json().eliminados).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar el fallido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": [\"{{mensajeFallido}}\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Borra uno\", () => pm.expect(pm.response.json().eliminados).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar sin ids",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes/eliminar-lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes",
+                "eliminar-lote"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ids\": []}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo ids\", () => pm.expect(pm.response.json().campo).to.eql(\"ids\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reportes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reportes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Resumen del periodo\", () => pm.expect([r.resumen.enviados, r.resumen.recibidos, r.resumen.fallidos]).to.eql([1, 2, 0]));",
+                  "pm.test(\"Campanas por estado\", () => pm.expect(r.campanas).to.eql({completada: 1, borrador: 1}));",
+                  "pm.test(\"Contactos y bajas\", () => pm.expect(r.contactos).to.eql({total: 23, dados_de_baja: 2}));",
+                  "pm.test(\"Un dia con actividad\", () => pm.expect(r.por_dia.length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte con periodo invertido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reportes?desde=2026-02-01&hasta=2026-01-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reportes"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-02-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-01-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo desde\", () => pm.expect(pm.response.json().campo).to.eql(\"desde\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte con fecha invalida",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reportes?hasta=ayer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reportes"
+              ],
+              "query": [
+                {
+                  "key": "hasta",
+                  "value": "ayer"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+                  "pm.test(\"Indica el campo hasta\", () => pm.expect(pm.response.json().campo).to.eql(\"hasta\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conversaciones sin ser staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "conversaciones"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Chat sin ser staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{acceso}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/conversaciones/0991112222/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "conversaciones",
+                "0991112222",
+                "mensajes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"texto\": \"Hola\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mensajes sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "mensajes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reportes sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reportes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reportes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Es problem+json\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "webhookSecreto",
+      "value": "solo-pruebas",
+      "type": "string"
+    }
+  ]
+}

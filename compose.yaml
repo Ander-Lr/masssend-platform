@@ -55,6 +55,7 @@ x-backend-ci: &backend-ci
     API_LIMITE_USUARIO: 100000/min
     API_LIMITE_SENSIBLE: 100000/min
     EMAIL_QUEUE_INTERVAL_MS: "200"
+    WHATSAPP_WEBHOOK_TOKEN: "${WHATSAPP_WEBHOOK_TOKEN:-solo-pruebas}"
   networks:
     - masssend_network
   restart: unless-stopped
@@ -116,6 +117,31 @@ services:
       <<: *adaptadores-reales
     volumes:
       - ./backend/media:/app/media
+    depends_on:
+      - backend
+      - postgres
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  # Igual que email-worker, pero toma los envios de campana vencidos y
+  # los manda a WhatsApp respetando el ritmo. Reemplaza al hilo del panel.
+  envio-worker:
+    profiles: [real]
+    build:
+      context: ./backend
+    container_name: masssend-envio-worker
+    command: ["python", "-m", "masssend.interfaces.workers.tareas_envio"]
+    env_file:
+      - ./backend/.env
+    environment:
+      WHATSAPP_API_URL: "http://whatsapp:3001"
+      POCKETBASE_URL: "http://pocketbase:8080"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
+      DB_SSL_REQUIRE: "False"
+      DEBUG: "False"
+      REDIS_URL: "redis://redis:6379/0"
+      <<: *adaptadores-reales
     depends_on:
       - backend
       - postgres
