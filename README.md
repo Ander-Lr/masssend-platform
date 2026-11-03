@@ -116,7 +116,7 @@ En el entorno de Postman cambia `modoPago` a `paypal`. **Checkout** devuelve la 
 
 PayPhone usa su botón de pago: el backend prepara el cobro, el cliente paga en el formulario de PayPhone y vuelve a la URL de respuesta con `?id=...&clientTransactionId=...`; ese `id` se envía al confirmar. En Payphone Developer crea una aplicación **WEB** en ambiente **PRUEBAS**, con la URL de respuesta `http://localhost:5173/billing/return?provider=payphone`. Copia `backend/.env.payphone.example` como `backend/.env.payphone` y pega el token y el StoreID de la pestaña *Credenciales*. `./levantar.sh` lo carga solo. Cada pasarela se activa por separado: PayPhone real no vuelve real a PayPal.
 
-En Postman cambia `modoPayphone` a `payphone` y usa la carpeta **PayPhone** de la colección 02. Después de pagar, copia el `id` de la URL de retorno en `payphoneId` y ejecuta **Confirmar PayPhone** antes de 5 minutos: si no se confirma a tiempo, PayPhone revierte el cobro.
+PayPhone solo abre su formulario si el navegador llega desde ese dominio, así que el perfil `ci` sirve en `http://localhost:5173` una página local de pagos (`infra/pasarela-local/`). En Postman cambia `modoPayphone` a `payphone` y usa la carpeta **PayPhone** de la colección 02: **Checkout PayPhone** guarda en `urlPagoLocal` la dirección que debes abrir. Después de pagar, la misma página muestra el `id`; cópialo en `payphoneId` y ejecuta **Confirmar PayPhone** antes de 5 minutos: si no se confirma a tiempo, PayPhone revierte el cobro.
 
 ## Estructura
 

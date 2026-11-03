@@ -297,6 +297,20 @@ services:
       - masssend_network
     restart: unless-stopped
 
+  # Pagina local en el dominio registrado en PayPhone: abre el formulario de
+  # pago y muestra el id del retorno, mientras no exista el frontend.
+  pasarela-local:
+    profiles: [ci]
+    image: nginx:1.27-alpine
+    volumes:
+      - ./infra/pasarela-local/index.html:/usr/share/nginx/html/index.html:ro
+      - ./infra/pasarela-local/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
 networks:
   masssend_network:
     driver: bridge

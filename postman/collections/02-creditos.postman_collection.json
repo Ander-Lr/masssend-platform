@@ -1654,7 +1654,10 @@
                   "pm.environment.set('compraPayphone', c.compra_id);",
                   "if (pm.environment.get('modoPayphone') === 'payphone') {",
                   "  pm.test(\"Lleva al formulario de PayPhone\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\//).and.not.include('pasarela.falsa'));",
-                  "  console.log('Modo payphone: abre esta URL, paga y copia en payphoneId el id de la URL de retorno. Tienes 5 minutos para Confirmar PayPhone: ' + c.url_pago);",
+                  "  // PayPhone solo abre su formulario si se llega desde el dominio registrado (localhost:5173).",
+                  "  const local = 'http://localhost:5173/?pagar=' + encodeURIComponent(c.url_pago);",
+                  "  pm.environment.set('urlPagoLocal', local);",
+                  "  console.log('Modo payphone: abre en el navegador ' + local + ' , paga y copia el id que muestra en payphoneId. Tienes 5 minutos para Confirmar PayPhone.');",
                   "} else {",
                   "  pm.test(\"Usa la pasarela simulada\", () => pm.expect(c.url_pago).to.match(/^https:\\/\\/pasarela\\.falsa\\//));",
                   "}"

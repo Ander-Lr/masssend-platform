@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- PayPhone solo abre su formulario si el navegador llega desde el dominio registrado. -->
+<meta name="referrer" content="origin">
+<title>MassSend · Pagos locales</title>
+<style>
+  :root {
+    --fondo: #f6f7f9; --tarjeta: #ffffff; --texto: #1d2330; --suave: #5b6475;
+    --borde: #dde1e8; --acento: #1f6feb; --exito: #1a7f37; --alerta: #9a6700; --error: #cf222e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #0f1218; --tarjeta: #171b23; --texto: #e6e9ef; --suave: #9aa3b2;
+      --borde: #2a303c; --acento: #4c8dff; --exito: #3fb950; --alerta: #d29922; --error: #f85149;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+    background: var(--fondo); color: var(--texto);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    width: 100%; max-width: 520px; background: var(--tarjeta);
+    border: 1px solid var(--borde); border-radius: 12px; padding: 24px;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  p { margin: 8px 0; color: var(--suave); }
+  .marca { font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--suave); }
+  .valor {
+    display: flex; gap: 8px; align-items: center; margin: 16px 0;
+    border: 1px solid var(--borde); border-radius: 8px; padding: 12px;
+  }
+  .valor code { font-size: 1.5rem; font-weight: 600; flex: 1; overflow-wrap: anywhere; }
+  .etiqueta { font-size: .85rem; color: var(--suave); }
+  button, .boton {
+    font: inherit; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer;
+    background: var(--acento); color: #fff; text-decoration: none; display: inline-block;
+  }
+  input {
+    width: 100%; font: inherit; padding: 10px; border-radius: 8px;
+    border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); margin: 8px 0;
+  }
+  .exito { color: var(--exito); } .alerta { color: var(--alerta); } .error { color: var(--error); }
+  ol { padding-left: 20px; color: var(--suave); } li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main id="contenido"></main>
+<script>
+  "use strict";
+  // Solo se redirige a formularios de pago conocidos: evita un redireccionamiento abierto.
+  const DESTINOS = ["pay.payphonetodoesposible.com", "payp.page.link", "www.sandbox.paypal.com"];
+  const raiz = document.getElementById("contenido");
+  const consulta = new URLSearchParams(location.search);
+
+  function crear(etiqueta, atributos = {}, texto = "") {
+    const nodo = document.createElement(etiqueta);
+    for (const [clave, valor] of Object.entries(atributos)) nodo.setAttribute(clave, valor);
+    if (texto) nodo.textContent = texto;
+    return nodo;
+  }
+
+  function encabezado(titulo, detalle, clase = "") {
+    raiz.append(crear("div", { class: "marca" }, "MassSend · pagos locales"));
+    raiz.append(crear("h1", { class: clase }, titulo));
+    if (detalle) raiz.append(crear("p", {}, detalle));
+  }
+
+  function valorCopiable(etiqueta, valor) {
+    const caja = crear("div", { class: "valor" });
+    const texto = crear("div");
+    texto.append(crear("div", { class: "etiqueta" }, etiqueta), crear("code", {}, valor));
+    const boton = crear("button", { type: "button" }, "Copiar");
+    boton.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(valor); boton.textContent = "Copiado"; }
+      catch { boton.textContent = "Selecciona y copia"; }
+    });
+    caja.append(texto, boton);
+    raiz.append(caja);
+  }
+
+  function destinoPermitido(valor) {
+    try {
+      const url = new URL(valor);
+      return url.protocol === "https:" && DESTINOS.includes(url.hostname) ? url.href : null;
+    } catch { return null; }
+  }
+
+  function pagar(valor) {
+    const destino = destinoPermitido(valor);
+    if (!destino) {
+      encabezado("URL de pago no válida", "Pega el url_pago que devolvió el checkout.", "error");
+      return formulario();
+    }
+    encabezado("Abriendo el formulario de pago…", "Si no se abre solo, usa el botón.");
+    const enlace = crear("a", { class: "boton", href: destino }, "Ir a pagar");
+    raiz.append(enlace);
+    setTimeout(() => location.assign(destino), 800);
+  }
+
+  function formulario() {
+    if (!raiz.children.length) {
+      encabezado("Pagos locales", "Pega el url_pago del checkout para abrirlo desde este dominio.");
+    }
+    const forma = crear("form");
+    const campo = crear("input", { type: "url", required: "", placeholder: "https://pay.payphonetodoesposible.com/..." });
+    forma.append(campo, crear("button", { type: "submit" }, "Ir a pagar"));
+    forma.addEventListener("submit", (evento) => {
+      evento.preventDefault();
+      location.assign("/?pagar=" + encodeURIComponent(campo.value.trim()));
+    });
+    raiz.append(forma);
+  }
+
+  function retornoPayphone() {
+    const id = consulta.get("id");
+    if (!id) {
+      encabezado("Pago cancelado", "PayPhone no envió un id: vuelve a ejecutar Checkout PayPhone.", "alerta");
+      return;
+    }
+    encabezado("Pago realizado en PayPhone", "Copia el id en la variable payphoneId y ejecuta Confirmar PayPhone.", "exito");
+    valorCopiable("id (payphoneId)", id);
+    const referencia = consulta.get("clientTransactionId");
+    if (referencia) raiz.append(crear("p", {}, "Referencia de la compra: " + referencia));
+    const reloj = crear("p", { class: "alerta" });
+    raiz.append(reloj);
+    const limite = Date.now() + 5 * 60 * 1000;
+    const tic = () => {
+      const resta = Math.max(0, Math.round((limite - Date.now()) / 1000));
+      const minutos = Math.floor(resta / 60), segundos = String(resta % 60).padStart(2, "0");
+      reloj.textContent = resta
+        ? `Confirma antes de ${minutos}:${segundos}; si no, PayPhone revierte el cobro.`
+        : "Pasaron 5 minutos: PayPhone pudo revertir el cobro. Haz una compra nueva.";
+      if (resta) setTimeout(tic, 1000);
+    };
+    tic();
+  }
+
+  function retornoPaypal() {
+    if (consulta.get("cancelled")) {
+      encabezado("Pago cancelado en PayPal", "Al confirmar, la compra quedará rechazada.", "alerta");
+      return;
+    }
+    encabezado("Pago aprobado en PayPal", "Ya puedes ejecutar Confirmar en Postman.", "exito");
+    const orden = consulta.get("token");
+    if (orden) raiz.append(crear("p", {}, "Orden de PayPal: " + orden));
+  }
+
+  if (location.pathname.startsWith("/billing/return")) {
+    const proveedor = consulta.get("provider");
+    if (proveedor === "payphone") retornoPayphone();
+    else if (proveedor === "paypal") retornoPaypal();
+    else encabezado("Retorno de pago", "No se reconoce la pasarela.", "alerta");
+  } else if (consulta.has("pagar")) {
+    pagar(consulta.get("pagar"));
+  } else {
+    formulario();
+  }
+</script>
+</body>
+</html>

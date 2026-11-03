@@ -179,6 +179,7 @@ if [[ " ${ACTIVAS[*]-} " == *" gmail "* ]]; then
 else
   info "  Correos:    http://localhost:${MAILPIT_PORT} (Mailpit)"
 fi
+info "  Pagos:      http://localhost:${FRONTEND_PORT:-5173} (abre ahi el url_pago de PayPhone)"
 info "  Asistente:  $([ "$IA" -eq 1 ] && echo "Ollama ($MODELO)" || echo "simulado (usa --ia para Ollama)")"
 info "  Staff:      staff@prueba.local / clave-larga-123"
 echo
