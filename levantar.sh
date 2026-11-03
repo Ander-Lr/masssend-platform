@@ -5,7 +5,7 @@
 #   (sin opciones)    reconstruye lo que cambio y levanta todo; si ya estaba arriba,
 #                     conserva los datos de prueba
 #   -l, --limpio      borra la base de prueba antes de levantar (empieza de cero)
-#   -i, --ia          agrega Ollama (perfil ia) y descarga el modelo si falta
+#   -i, --ia          agrega Ollama aunque no exista backend/.env.ia
 #   -s, --sin NOMBRE  no usa una integracion aunque exista (ej. --sin paypal); se repite
 #   -a, --actualizar  trae lo ultimo de origin/main (git pull --ff-only) antes de levantar
 #       --apagar      detiene todo; la base de prueba vive en memoria y se borra
@@ -17,6 +17,7 @@
 # nueva solo se crea su plantilla .example; este script no cambia. En la plantilla:
 #   "# Postman: ..."      indica que variables cambiar en el entorno de Postman
 #   "# Opcional. ..."     encima de una variable permite dejarla vacia
+#   "# Perfil: ..."       agrega un perfil de compose (ej. ia levanta Ollama)
 #
 # Variables: PROYECTO (masssend-ci), API_PORT (8000), MAILPIT_PORT (8025).
 # Nunca imprime los valores de los archivos .env.
@@ -96,7 +97,7 @@ excluida() {
   return 1
 }
 
-ARCHIVOS=(--env-file "$BASE_ENV"); ACTIVAS=(); RESUMEN=(); POSTMAN=()
+ARCHIVOS=(--env-file "$BASE_ENV"); ACTIVAS=(); RESUMEN=(); POSTMAN=(); PERFILES_EXTRA=()
 detectar() {
   local plantilla nombre real faltan
   for plantilla in backend/.env.*.example; do
@@ -116,6 +117,11 @@ detectar() {
         RESUMEN+=("$nombre|${VERDE}real${NORMAL}|$real")
         while IFS= read -r linea; do POSTMAN+=("${linea#*Postman: }"); done \
           < <(grep -E '^# Postman:' "$plantilla" || true)
+        while IFS= read -r linea; do PERFILES_EXTRA+=("${linea#*Perfil: }"); done \
+          < <(grep -E '^# Perfil:' "$plantilla" || true)
+        if [ "$nombre" = "ia" ] && [ -n "$(valor OLLAMA_MODEL_CI "$real")" ]; then
+          MODELO="$(valor OLLAMA_MODEL_CI "$real")"
+        fi
       fi
     fi
   done
@@ -133,6 +139,9 @@ mostrar_integraciones() {
 
 detectar
 PERFILES=(--profile ci)
+for perfil in "${PERFILES_EXTRA[@]+"${PERFILES_EXTRA[@]}"}"; do
+  [ "$perfil" = "ia" ] && IA=1 || PERFILES+=(--profile "$perfil")
+done
 [ "$IA" -eq 1 ] && PERFILES+=(--profile ia)
 compose() { docker compose -p "$PROYECTO" "${ARCHIVOS[@]}" "$@"; }
 
@@ -180,7 +189,7 @@ else
   info "  Correos:    http://localhost:${MAILPIT_PORT} (Mailpit)"
 fi
 info "  Pagos:      http://localhost:${FRONTEND_PORT:-5173} (abre ahi el url_pago de PayPhone)"
-info "  Asistente:  $([ "$IA" -eq 1 ] && echo "Ollama ($MODELO)" || echo "simulado (usa --ia para Ollama)")"
+info "  Asistente:  $([ "$IA" -eq 1 ] && echo "Ollama ($MODELO)" || echo "simulado (crea backend/.env.ia para Ollama)")"
 info "  Staff:      staff@prueba.local / clave-larga-123"
 echo
 info "${NEGRITA}En Postman (entorno MassSend local)${NORMAL}"
