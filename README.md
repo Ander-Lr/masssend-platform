@@ -74,6 +74,16 @@ Importa `postman/environments/local.postman_environment.json` y las colecciones 
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci down -v
 ```
 
+### Correos reales con Gmail
+
+Por defecto los correos del perfil `ci` quedan en Mailpit. Para recibirlos en Gmail, copia `backend/.env.gmail.example` como `backend/.env.gmail`, completa tu cuenta y una contraseña de aplicación, y agrega ese archivo al comando:
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend/.env.gmail --profile ci up --build -d --wait
+```
+
+En el entorno de Postman cambia `modoCorreo` a `gmail` y escribe tu correo en `correoReal`. Los códigos se copian desde tu bandeja.
+
 ## Estructura
 
 ```

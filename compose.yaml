@@ -37,7 +37,10 @@ x-backend-ci: &backend-ci
     OLLAMA_MODEL: "${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
     PASARELA_PAGO_FAKE: "1"
     API_LIMITE_ASISTENTE: 100000/min
-    DESTINO_CORREO: mailpit
+    # Por defecto Mailpit. Con backend/.env.gmail los correos salen por Gmail.
+    DESTINO_CORREO: "${DESTINO_CORREO_CI:-mailpit}"
+    EMAIL_USER: "${EMAIL_USER:-}"
+    EMAIL_APP_PASSWORD: "${EMAIL_APP_PASSWORD:-}"
     PROVEEDOR_GOOGLE: fake
     FREE_SIGNUP_CREDITS: "10"
     API_LIMITE_ANONIMO: 100000/min
