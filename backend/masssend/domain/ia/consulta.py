@@ -7,17 +7,12 @@ from masssend.domain.shared.errores import DatosInvalidos
 LONGITUD_MAXIMA = 2000
 TURNOS_MAXIMOS = 6
 LONGITUD_MAXIMA_TURNO = 500
-USUARIO = "user"
 
 
 @dataclass(frozen=True, slots=True)
 class Turno:
     rol: str
     contenido: str
-
-    @property
-    def etiqueta(self) -> str:
-        return "Usuario" if self.rol == USUARIO else "Asistente"
 
 
 @dataclass(frozen=True, slots=True)

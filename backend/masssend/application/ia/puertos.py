@@ -3,6 +3,14 @@ from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
+class MensajeChat:
+    """rol es system, user o assistant, como en las API de chat."""
+
+    rol: str
+    contenido: str
+
+
+@dataclass(frozen=True, slots=True)
 class TextoGenerado:
     texto: str
     modelo: str
@@ -16,7 +24,7 @@ class EstadoGenerador:
 
 
 class IGeneradorTexto(Protocol):
-    def generar(self, prompt: str) -> TextoGenerado:
+    def generar(self, mensajes: list[MensajeChat]) -> TextoGenerado:
         """Lanza ServicioNoDisponible si el modelo no responde."""
         ...
 

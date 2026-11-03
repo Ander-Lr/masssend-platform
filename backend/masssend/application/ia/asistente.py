@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from masssend.application.ia.puertos import EstadoGenerador, IGeneradorTexto
+from masssend.application.ia.puertos import EstadoGenerador, IGeneradorTexto, MensajeChat
 from masssend.application.shared.puertos import IReloj
 from masssend.domain.ia.consulta import Consulta, Turno
 
@@ -32,11 +32,13 @@ Si preguntan algo ajeno a MassSend o a la redacción de mensajes, indica amablem
 que solo puedes ayudar con el uso de la plataforma."""
 
 
-def armar_prompt(consulta: Consulta) -> str:
-    partes = [CONTEXTO_SISTEMA, ""]
-    partes += [f"{turno.etiqueta}: {turno.contenido}" for turno in consulta.historial]
-    partes += [f"Usuario: {consulta.pregunta}", "Asistente:"]
-    return "\n".join(partes)
+def armar_mensajes(consulta: Consulta) -> list[MensajeChat]:
+    # Las instrucciones van en su propio rol: en un solo texto, un modelo
+    # pequeno las confunde con la pregunta y responde cosas como "SI.".
+    mensajes = [MensajeChat("system", CONTEXTO_SISTEMA)]
+    mensajes += [MensajeChat(turno.rol, turno.contenido) for turno in consulta.historial]
+    mensajes.append(MensajeChat("user", consulta.pregunta))
+    return mensajes
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +56,7 @@ class ConsultarAsistente:
     def ejecutar(self, pregunta: str, historial: list[Turno]) -> RespuestaAsistente:
         consulta = Consulta.crear(pregunta, historial)
         inicio = self._reloj.ahora()
-        generado = self._generador.generar(armar_prompt(consulta))
+        generado = self._generador.generar(armar_mensajes(consulta))
         latencia = self._reloj.ahora() - inicio
         return RespuestaAsistente(
             generado.texto.strip(), generado.modelo, round(latencia.total_seconds() * 1000)

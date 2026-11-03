@@ -2,7 +2,7 @@ import logging
 
 import requests
 
-from masssend.application.ia.puertos import EstadoGenerador, TextoGenerado
+from masssend.application.ia.puertos import EstadoGenerador, MensajeChat, TextoGenerado
 from masssend.domain.shared.errores import ServicioNoDisponible
 
 logger = logging.getLogger(__name__)
@@ -14,24 +14,26 @@ class GeneradorOllama:
         self._modelo = modelo
         self._tiempo_maximo = tiempo_maximo
 
-    def generar(self, prompt: str) -> TextoGenerado:
+    def generar(self, mensajes: list[MensajeChat]) -> TextoGenerado:
         try:
             respuesta = requests.post(
-                f"{self._url}/api/generate",
+                f"{self._url}/api/chat",
                 json={
                     "model": self._modelo,
-                    "prompt": prompt,
+                    "messages": [{"role": m.rol, "content": m.contenido} for m in mensajes],
                     "stream": False,
-                    "options": {"temperature": 0.3, "num_predict": 220},
+                    # repeat_penalty evita que un modelo pequeno entre en bucle.
+                    "options": {"temperature": 0.3, "num_predict": 220, "repeat_penalty": 1.15},
                 },
                 timeout=self._tiempo_maximo,
             )
             respuesta.raise_for_status()
             datos = respuesta.json()
-        except (requests.RequestException, ValueError) as error:
+            texto = str(datos["message"]["content"])
+        except (requests.RequestException, ValueError, KeyError, TypeError) as error:
             logger.warning("Ollama no respondio: %s", type(error).__name__)
             raise ServicioNoDisponible("El asistente no está disponible.") from error
-        return TextoGenerado(str(datos.get("response", "")), str(datos.get("model", self._modelo)))
+        return TextoGenerado(texto, str(datos.get("model", self._modelo)))
 
     def estado(self) -> EstadoGenerador:
         try:

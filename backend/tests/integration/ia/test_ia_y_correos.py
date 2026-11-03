@@ -17,6 +17,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
 from email_auth.models import EmailTask, QueueControl
+from masssend.application.ia.puertos import MensajeChat
 from masssend.domain.identidad.notificacion import CABECERA_PDF
 from masssend.domain.shared.errores import ServicioNoDisponible
 from masssend.infrastructure.adapters.ia.ollama import GeneradorOllama
@@ -97,16 +98,39 @@ def test_si_ollama_tarda_responde_503(client: Client, settings: Any) -> None:
     assert respuesta.status_code == 503
 
 
-def test_ollama_envia_el_prompt_y_lee_la_respuesta() -> None:
+def test_ollama_envia_los_mensajes_por_chat_y_lee_la_respuesta() -> None:
     simulada = MagicMock()
-    simulada.json.return_value = {"response": " hola ", "model": "m"}
+    simulada.json.return_value = {
+        "message": {"role": "assistant", "content": " hola "},
+        "model": "m",
+    }
     ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
+    mensajes = [MensajeChat("system", "contexto"), MensajeChat("user", "pregunta")]
     with patch(ruta, return_value=simulada) as llamada:
-        generado = GeneradorOllama("http://ollama/", "m", 5).generar("prompt")
-    assert generado.texto == " hola "
-    assert llamada.call_args.args[0] == "http://ollama/api/generate"
-    assert llamada.call_args.kwargs["json"]["prompt"] == "prompt"
+        generado = GeneradorOllama("http://ollama/", "m", 5).generar(mensajes)
+    assert (generado.texto, generado.modelo) == (" hola ", "m")
+    assert llamada.call_args.args[0] == "http://ollama/api/chat"
+    cuerpo = llamada.call_args.kwargs["json"]
+    assert cuerpo["messages"] == [
+        {"role": "system", "content": "contexto"},
+        {"role": "user", "content": "pregunta"},
+    ]
+    assert cuerpo["stream"] is False
+    assert cuerpo["options"]["repeat_penalty"] > 1
     assert llamada.call_args.kwargs["timeout"] == 5
+
+
+@pytest.mark.parametrize(
+    "cuerpo",
+    [{"error": "prediction aborted, token repeat limit reached"}, {"message": None}, []],
+    ids=["sin-mensaje", "mensaje-nulo", "no-es-objeto"],
+)
+def test_ollama_con_respuesta_rara_responde_no_disponible(cuerpo: Any) -> None:
+    simulada = MagicMock()
+    simulada.json.return_value = cuerpo
+    ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
+    with patch(ruta, return_value=simulada), pytest.raises(ServicioNoDisponible):
+        GeneradorOllama("http://ollama", "m", 5).generar([MensajeChat("user", "x")])
 
 
 def test_ollama_distingue_el_modelo_exacto() -> None:
@@ -129,7 +153,7 @@ def test_ollama_apagado_se_informa_sin_fallar() -> None:
 def test_con_ollama_caido_no_se_lanza_en_generar() -> None:
     ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
     with patch(ruta, side_effect=requests.ConnectionError), pytest.raises(ServicioNoDisponible):
-        GeneradorOllama("http://ollama", "m", 5).generar("x")
+        GeneradorOllama("http://ollama", "m", 5).generar([MensajeChat("user", "x")])
 
 
 def test_staff_encola_y_el_trabajador_envia(client: Client) -> None:

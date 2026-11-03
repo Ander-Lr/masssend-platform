@@ -6,9 +6,14 @@ from masssend.application.ia.asistente import (
     CONTEXTO_SISTEMA,
     ConsultarAsistente,
     RevisarAsistente,
-    armar_prompt,
+    armar_mensajes,
 )
-from masssend.application.ia.puertos import EstadoGenerador, IGeneradorTexto, TextoGenerado
+from masssend.application.ia.puertos import (
+    EstadoGenerador,
+    IGeneradorTexto,
+    MensajeChat,
+    TextoGenerado,
+)
 from masssend.domain.ia.consulta import Consulta, Turno
 from masssend.domain.shared.errores import DatosInvalidos
 from tests.fakes.reloj import RelojFijo
@@ -17,10 +22,10 @@ from tests.fakes.reloj import RelojFijo
 class GeneradorDePrueba:
     def __init__(self, reloj: RelojFijo) -> None:
         self._reloj = reloj
-        self.prompts: list[str] = []
+        self.prompts: list[list[MensajeChat]] = []
 
-    def generar(self, prompt: str) -> TextoGenerado:
-        self.prompts.append(prompt)
+    def generar(self, mensajes: list[MensajeChat]) -> TextoGenerado:
+        self.prompts.append(mensajes)
         self._reloj.avanzar(timedelta(milliseconds=250))
         return TextoGenerado("  hola  ", "modelo")
 
@@ -50,16 +55,30 @@ def test_recorta_cada_turno() -> None:
     assert len(consulta.historial[0].contenido) == 500
 
 
-def test_el_prompt_lleva_contexto_historial_y_pregunta_en_orden() -> None:
+def test_los_mensajes_llevan_contexto_historial_y_pregunta_en_orden() -> None:
     consulta = Consulta.crear(
         "como compro",
         [Turno("user", "hola"), Turno("assistant", "buenas")],
     )
-    prompt = armar_prompt(consulta)
-    assert prompt.startswith(CONTEXTO_SISTEMA)
-    assert prompt.endswith(
-        "Usuario: hola\nAsistente: buenas\nUsuario: como compro\nAsistente:"
-    )
+    assert armar_mensajes(consulta) == [
+        MensajeChat("system", CONTEXTO_SISTEMA),
+        MensajeChat("user", "hola"),
+        MensajeChat("assistant", "buenas"),
+        MensajeChat("user", "como compro"),
+    ]
+
+
+def test_consultar_envia_al_modelo_los_mensajes_armados() -> None:
+    reloj = RelojFijo()
+    generador = GeneradorDePrueba(reloj)
+    ConsultarAsistente(generador, reloj).ejecutar("  como compro ", [Turno("user", "hola")])
+    assert generador.prompts == [
+        [
+            MensajeChat("system", CONTEXTO_SISTEMA),
+            MensajeChat("user", "hola"),
+            MensajeChat("user", "como compro"),
+        ]
+    ]
 
 
 def test_consultar_limpia_el_texto_y_mide_la_latencia() -> None:
