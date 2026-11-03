@@ -36,6 +36,7 @@ from masssend.application.identidad.sesion import (
     RenovarToken,
     ValidarTotp,
 )
+from masssend.domain.shared.errores import ServicioNoDisponible
 from masssend.infrastructure.adapters.correo.cola import ColaEmailTask
 from masssend.infrastructure.adapters.correo.notificaciones import ColaNotificacionesDjango
 from masssend.infrastructure.adapters.correo.procesador import ProcesadorCola
@@ -72,6 +73,9 @@ class ContenedorIdentidad:
     def _google(self) -> IProveedorGoogle:
         if settings.PROVEEDOR_GOOGLE == "fake":
             return ProveedorGoogleFalso()
+        if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+            # Sin credenciales, Google rechazaria al usuario despues de elegir su cuenta.
+            raise ServicioNoDisponible("El acceso con Google no está configurado.")
         return ProveedorGoogleOauth(
             settings.GOOGLE_CLIENT_ID, settings.GOOGLE_CLIENT_SECRET, settings.GOOGLE_RETORNO_V1
         )

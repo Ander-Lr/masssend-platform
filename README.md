@@ -84,6 +84,16 @@ docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend
 
 En el entorno de Postman cambia `modoCorreo` a `gmail` y escribe tu correo en `correoReal`. Los códigos se copian desde tu bandeja.
 
+### Acceso con Google real
+
+Por defecto el perfil `ci` usa un Google falso. Para entrar con tu cuenta de Google, crea en Google Cloud un ID de cliente OAuth de tipo *Aplicación web* con la URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback`. Copia `backend/.env.google.example` como `backend/.env.google`, pega el ID y el secreto, y agrega ese archivo al comando (se puede combinar con `backend/.env.gmail`):
+
+```bash
+docker compose -p masssend-ci --env-file backend/tests/ci.env --env-file backend/.env.google --profile ci up --build -d --wait
+```
+
+En el entorno de Postman cambia `modoGoogle` a `google`. **Iniciar Google** devuelve una URL: ábrela en el navegador antes de 10 minutos y elige tu cuenta. El navegador muestra el siguiente paso y un `token_desafio`, con el que se continúa el doble factor en Postman. **Completar Google** se omite en este modo, porque Google entrega el código al navegador.
+
 ## Estructura
 
 ```

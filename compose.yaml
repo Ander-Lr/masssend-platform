@@ -41,7 +41,11 @@ x-backend-ci: &backend-ci
     DESTINO_CORREO: "${DESTINO_CORREO_CI:-mailpit}"
     EMAIL_USER: "${EMAIL_USER:-}"
     EMAIL_APP_PASSWORD: "${EMAIL_APP_PASSWORD:-}"
-    PROVEEDOR_GOOGLE: fake
+    # Por defecto Google falso. Con backend/.env.google se usa la cuenta real.
+    PROVEEDOR_GOOGLE: "${PROVEEDOR_GOOGLE_CI:-fake}"
+    GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+    GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+    GOOGLE_RETORNO_V1: "${GOOGLE_RETORNO_V1:-}"
     FREE_SIGNUP_CREDITS: "10"
     API_LIMITE_ANONIMO: 100000/min
     API_LIMITE_USUARIO: 100000/min

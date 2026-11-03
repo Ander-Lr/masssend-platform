@@ -6,6 +6,7 @@ backend/**/*.pyc
 backend/**/*.pyo
 backend/.env
 backend/.env.gmail
+backend/.env.google
 /.env
 /.env.*
 !/.env.example
