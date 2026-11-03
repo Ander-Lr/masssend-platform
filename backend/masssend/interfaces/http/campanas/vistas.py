@@ -9,12 +9,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from masssend.application.campanas.campanas import CambiosCampana, DetalleCampana
+from masssend.application.envio.lanzamiento import EstadoEnvioCampana
 from masssend.domain.campanas.archivo import LIMITE_MB
 from masssend.domain.campanas.campana import MAX_MENSAJE, MAX_NOMBRE, Campana, EstadoCampana
 from masssend.domain.campanas.repositorios import FiltroCampanas
 from masssend.domain.shared.errores import DatosInvalidos, RecursoNoEncontrado
 from masssend.domain.shared.identificadores import IdPublico, id_publico
 from masssend.infrastructure.composition.campanas import contenedor_campanas as campanas
+from masssend.infrastructure.composition.envio import contenedor_envio as envio
 from masssend.interfaces.http.contactos.vistas import Etiquetas, validar
 from masssend.interfaces.http.shared.paginacion import peticion_pagina, respuesta_pagina
 from masssend.interfaces.http.shared.vistas import VistaApi, cuenta_actual
@@ -138,3 +140,62 @@ class AdjuntoVista(VistaApi):
         respuesta["X-Content-Type-Options"] = "nosniff"
         respuesta["Cache-Control"] = "private, no-store"
         return respuesta
+
+
+def progreso_json(estado: EstadoEnvioCampana) -> dict[str, Any]:
+    p = estado.progreso
+    return {
+        "campana_id": str(estado.campana_id),
+        "estado": estado.estado.value,
+        "total": p.total,
+        "enviados": p.enviados,
+        "fallidos": p.fallidos,
+        "omitidos": p.omitidos,
+        "cancelados": p.cancelados,
+        "pendientes": p.pendientes,
+        "porcentaje": p.porcentaje,
+    }
+
+
+def ruta_progreso(campana_id: IdPublico) -> str:
+    return f"/api/v1/campanas/{campana_id}/progreso"
+
+
+class LanzarVista(VistaApi):
+    """202: el envio queda en la cola. El avance se consulta en el enlace."""
+
+    def post(self, request: Request, campana_id: str) -> Response:
+        lanzada = envio.lanzar_campana().ejecutar(cuenta_actual(request), id_de_ruta(campana_id))
+        progreso = ruta_progreso(lanzada.campana_id)
+        respuesta = Response(
+            {
+                "campana_id": str(lanzada.campana_id),
+                "total": lanzada.total,
+                "duracion_estimada_segundos": lanzada.duracion_estimada_segundos,
+                "progreso_url": progreso,
+            },
+            status=202,
+        )
+        respuesta["Location"] = progreso
+        return respuesta
+
+
+class CancelarVista(VistaApi):
+    def post(self, request: Request, campana_id: str) -> Response:
+        cancelada = envio.cancelar_campana().ejecutar(
+            cuenta_actual(request), id_de_ruta(campana_id)
+        )
+        return Response(
+            {
+                "campana_id": str(cancelada.campana_id),
+                "estado": "cancelada",
+                "envios_cancelados": cancelada.envios_cancelados,
+                "creditos_liberados": cancelada.creditos_liberados,
+            }
+        )
+
+
+class ProgresoVista(VistaApi):
+    def get(self, request: Request, campana_id: str) -> Response:
+        estado = envio.consultar_progreso().ejecutar(cuenta_actual(request), id_de_ruta(campana_id))
+        return Response(progreso_json(estado))

@@ -37,6 +37,7 @@ class Envio:
     estado: EstadoEnvio = EstadoEnvio.PENDIENTE
     id_externo: str | None = None
     detalle: str | None = None
+    texto: str | None = None
 
     @property
     def pendiente(self) -> bool:

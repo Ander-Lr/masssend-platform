@@ -12,6 +12,7 @@ INSTALLED_APPS = [
     "masssend.infrastructure.persistence.identidad",
     "masssend.infrastructure.persistence.creditos",
     "masssend.infrastructure.persistence.campanas",
+    "masssend.infrastructure.persistence.envio",
 ]
 
 ROOT_URLCONF = "config.urls"

@@ -91,6 +91,8 @@ class ProcesarEnvio:
             campana.mensaje_para(contacto.nombre, contacto.datos),
             campana.adjunto,
         )
+        # Se guarda lo que realmente se envio: el historial no cambia si luego se edita el contacto.
+        envio.texto = solicitud.texto
         try:
             resultado = self._canal.enviar(solicitud)
         except ServicioNoDisponible:
