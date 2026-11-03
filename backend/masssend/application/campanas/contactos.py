@@ -1,12 +1,13 @@
 """Casos de uso de la libreta de contactos, trasladados de mass_sender/views.py."""
 
-from collections.abc import Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 
 from masssend.application.shared.puertos import IGeneradorIds, IUnidadDeTrabajo
 from masssend.domain.campanas.contacto import Contacto
 from masssend.domain.campanas.repositorios import FiltroContactos, IRepoContactos
 from masssend.domain.campanas.telefono import Telefono
+from masssend.domain.shared.errores import DatosInvalidos
 from masssend.domain.shared.identificadores import IdPublico
 from masssend.domain.shared.paginacion import Pagina, PeticionPagina
 
@@ -22,7 +23,7 @@ class CambiosContacto:
     """Solo se aplica lo que no es None, como en el PUT del sistema actual."""
 
     nombre: str | None = None
-    etiquetas: str | None = None
+    etiquetas: str | Iterable[str] | None = None
     datos: Mapping[str, str] | None = None
     dado_de_baja: bool | None = None
 
@@ -38,7 +39,11 @@ class GuardarContacto:
         self._uow = uow
 
     def ejecutar(
-        self, owner_id: IdPublico, telefono: str, nombre: str = "", etiquetas: str = ""
+        self,
+        owner_id: IdPublico,
+        telefono: str,
+        nombre: str = "",
+        etiquetas: str | Iterable[str] = "",
     ) -> ContactoGuardado:
         numero = Telefono.desde_texto(telefono)
         with self._uow:
@@ -110,3 +115,30 @@ class EliminarContacto:
     def ejecutar(self, owner_id: IdPublico, contacto_id: IdPublico) -> None:
         with self._uow:
             self._contactos.eliminar(owner_id, contacto_id)
+
+
+class EliminarContactos:
+    """Borrado en lote. Un id ajeno o inexistente no falla: simplemente no cuenta."""
+
+    MAXIMO = 500
+
+    def __init__(self, contactos: IRepoContactos, uow: IUnidadDeTrabajo) -> None:
+        self._contactos = contactos
+        self._uow = uow
+
+    def ejecutar(self, owner_id: IdPublico, contacto_ids: Collection[IdPublico]) -> int:
+        unicos = set(contacto_ids)
+        if not unicos:
+            raise DatosInvalidos("Indica al menos un contacto.", "ids")
+        if len(unicos) > self.MAXIMO:
+            raise DatosInvalidos(f"Máximo {self.MAXIMO} contactos por petición.", "ids")
+        with self._uow:
+            return self._contactos.eliminar_varios(owner_id, unicos)
+
+
+class ListarEtiquetas:
+    def __init__(self, contactos: IRepoContactos) -> None:
+        self._contactos = contactos
+
+    def ejecutar(self, owner_id: IdPublico) -> list[str]:
+        return self._contactos.etiquetas(owner_id)

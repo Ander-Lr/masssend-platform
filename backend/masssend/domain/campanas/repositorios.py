@@ -41,6 +41,16 @@ class IRepoContactos(Protocol):
         """Lanza RecursoNoEncontrado si no existe o es de otro dueno."""
         ...
 
+    def eliminar_varios(self, owner_id: IdPublico, contacto_ids: Collection[IdPublico]) -> int:
+        """Borra solo los propios e ignora el resto. Devuelve cuantos borro."""
+        ...
+
     def listar(
         self, owner_id: IdPublico, filtro: FiltroContactos, peticion: PeticionPagina
-    ) -> Pagina[Contacto]: ...
+    ) -> Pagina[Contacto]:
+        """Del mas nuevo al mas antiguo, por cursor."""
+        ...
+
+    def etiquetas(self, owner_id: IdPublico) -> list[str]:
+        """Etiquetas distintas que usa el dueno, en orden alfabetico."""
+        ...

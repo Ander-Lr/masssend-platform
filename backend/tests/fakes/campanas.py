@@ -56,6 +56,20 @@ class RepoContactosMemoria:
         del self._por_telefono[(owner_id, contacto.telefono)]
         del self.contactos[contacto_id]
 
+    def eliminar_varios(self, owner_id: IdPublico, contacto_ids: Collection[IdPublico]) -> int:
+        borrados = 0
+        for contacto_id in contacto_ids:
+            contacto = self.contactos.get(contacto_id)
+            if contacto is not None and contacto.pertenece_a(owner_id):
+                self.eliminar(owner_id, contacto_id)
+                borrados += 1
+        return borrados
+
+    def etiquetas(self, owner_id: IdPublico) -> list[str]:
+        return sorted(
+            {e for c in self.contactos.values() if c.pertenece_a(owner_id) for e in c.etiquetas}
+        )
+
     def listar(
         self, owner_id: IdPublico, filtro: FiltroContactos, peticion: PeticionPagina
     ) -> Pagina[Contacto]:
@@ -69,10 +83,11 @@ class RepoContactosMemoria:
                 and (filtro.etiqueta is None or filtro.etiqueta in c.etiquetas)
             ),
             key=lambda c: str(c.id),
+            reverse=True,
         )
         if peticion.cursor is not None:
             ultimo = peticion.cursor.valores[0]
-            filas = [c for c in filas if str(c.id) > ultimo]
+            filas = [c for c in filas if str(c.id) < ultimo]
         return Pagina.desde_filas(
             filas[: peticion.limite + 1], peticion, lambda c: Cursor((str(c.id),))
         )

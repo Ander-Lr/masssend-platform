@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
 
@@ -6,8 +7,10 @@ from masssend.application.campanas.contactos import (
     CambiosContacto,
     EditarContacto,
     EliminarContacto,
+    EliminarContactos,
     GuardarContacto,
     ListarContactos,
+    ListarEtiquetas,
     ObtenerContacto,
 )
 from masssend.domain.campanas.contacto import Contacto
@@ -37,9 +40,9 @@ class Entorno:
         resultado = caso.ejecutar(dueno or self.ana, telefono, nombre, etiquetas)
         return resultado.contacto, resultado.creado
 
-    def editar(self, contacto_id: IdPublico, dueno: IdPublico, **cambios: object) -> Contacto:
+    def editar(self, contacto_id: IdPublico, dueno: IdPublico, **cambios: Any) -> Contacto:
         caso = EditarContacto(self.contactos, self.uow)
-        return caso.ejecutar(dueno, contacto_id, CambiosContacto(**cambios))  # type: ignore[arg-type]
+        return caso.ejecutar(dueno, contacto_id, CambiosContacto(**cambios))
 
 
 def test_el_fake_cumple_el_repositorio() -> None:
@@ -146,3 +149,46 @@ def test_listar_pagina_por_cursor() -> None:
     assert len(segunda.elementos) == 2 and not segunda.tiene_mas
     vistos = {c.id for c in primera.elementos + segunda.elementos}
     assert len(vistos) == 5
+
+
+def test_listar_va_del_mas_nuevo_al_mas_antiguo() -> None:
+    e = Entorno()
+    primero, _ = e.guardar("0991111111")
+    segundo, _ = e.guardar("0992222222")
+    ids = [c.id for c in ListarContactos(e.contactos).ejecutar(e.ana).elementos]
+    assert ids == [segundo.id, primero.id]
+
+
+def test_guardar_acepta_etiquetas_en_lista() -> None:
+    e = Entorno()
+    contacto, _ = e.guardar("0991112222", etiquetas="vip")
+    editado = e.editar(contacto.id, e.ana, etiquetas=["lead", " vip "])
+    assert editado.etiquetas == ("lead", "vip")
+
+
+def test_eliminar_varios_solo_borra_los_propios() -> None:
+    e = Entorno()
+    a, _ = e.guardar("0991111111")
+    b, _ = e.guardar("0992222222")
+    ajeno, _ = e.guardar("0993333333", dueno=e.luis)
+    caso = EliminarContactos(e.contactos, e.uow)
+    assert caso.ejecutar(e.ana, [a.id, b.id, ajeno.id, e.ids.nuevo(), a.id]) == 2
+    assert list(e.contactos.contactos) == [ajeno.id]
+
+
+@pytest.mark.parametrize("cantidad", [0, EliminarContactos.MAXIMO + 1])
+def test_eliminar_varios_exige_una_cantidad_razonable(cantidad: int) -> None:
+    e = Entorno()
+    with pytest.raises(DatosInvalidos) as error:
+        EliminarContactos(e.contactos, e.uow).ejecutar(
+            e.ana, [e.ids.nuevo() for _ in range(cantidad)]
+        )
+    assert error.value.campo == "ids"
+
+
+def test_las_etiquetas_son_del_dueno_y_sin_repetir() -> None:
+    e = Entorno()
+    e.guardar("0991111111", etiquetas="vip, cliente")
+    e.guardar("0992222222", etiquetas="vip")
+    e.guardar("0993333333", etiquetas="secreta", dueno=e.luis)
+    assert ListarEtiquetas(e.contactos).ejecutar(e.ana) == ["cliente", "vip"]

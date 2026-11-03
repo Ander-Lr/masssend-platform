@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "masssend.infrastructure.persistence.identidad",
     "masssend.infrastructure.persistence.creditos",
+    "masssend.infrastructure.persistence.campanas",
 ]
 
 ROOT_URLCONF = "config.urls"

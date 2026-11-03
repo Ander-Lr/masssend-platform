@@ -12,6 +12,7 @@ urlpatterns = [
     path("", include("masssend.interfaces.http.pagos.urls")),
     path("", include("masssend.interfaces.http.ia.urls")),
     path("", include("masssend.interfaces.http.notificaciones.urls")),
+    path("", include("masssend.interfaces.http.contactos.urls")),
     # Debe ser siempre la ultima: una ruta desconocida responde problem+json.
     re_path(r"^(?P<resto>.*)$", ruta_no_encontrada, name="v1_no_encontrada"),
 ]
