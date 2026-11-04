@@ -77,3 +77,6 @@ Thumbs.db
 *.tmp
 
 docs/
+
+# Resultados de JMeter
+jmeter/resultados/
