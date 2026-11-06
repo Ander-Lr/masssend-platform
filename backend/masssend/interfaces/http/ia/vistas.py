@@ -25,12 +25,12 @@ class MensajesVista(VistaApi):
     throttle_classes = [LimiteAsistente]
 
     def post(self, request: Request) -> Response:
-        cuenta_actual(request)
+        owner_id = cuenta_actual(request)
         entrada = Mensaje(data=request.data)
         entrada.is_valid(raise_exception=True)
         datos: dict[str, Any] = dict(entrada.validated_data)
         historial = [Turno(t["rol"], t["contenido"]) for t in datos["historial"]]
-        return Response(asdict(ia.consultar().ejecutar(datos["pregunta"], historial)))
+        return Response(asdict(ia.consultar().ejecutar(owner_id, datos["pregunta"], historial)))
 
 
 class SaludVista(VistaApi):

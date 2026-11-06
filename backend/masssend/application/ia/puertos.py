@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from masssend.domain.shared.identificadores import IdPublico
+
 
 @dataclass(frozen=True, slots=True)
 class MensajeChat:
@@ -31,3 +33,15 @@ class IGeneradorTexto(Protocol):
         ...
 
     def estado(self) -> EstadoGenerador: ...
+
+
+@dataclass(frozen=True, slots=True)
+class SaldoCuenta:
+    disponible: int
+    reservado: int
+
+
+class ISaldoCreditos(Protocol):
+    """El asistente lo define y el modulo de creditos lo implementa, sin conocerse."""
+
+    def saldo(self, owner_id: IdPublico) -> SaldoCuenta: ...

@@ -27,6 +27,7 @@ from masssend.interfaces.workers.tareas_correo import procesar_pendientes
 
 pytestmark = pytest.mark.django_db
 Usuario = get_user_model()
+REDACTA = {"pregunta": "Redacta un mensaje para mi tienda"}
 NOTA = {"destinatario": "luis@prueba.local", "asunto": "A", "titulo": "T", "mensaje": "M"}
 
 
@@ -54,10 +55,33 @@ def post_json(client: Client, ruta: str, datos: Any, auth: dict[str, str]) -> An
 
 def test_el_asistente_responde_con_el_generador_falso(client: Client) -> None:
     respuesta = post_json(
-        client, "asistente/mensajes", {"pregunta": "hola"}, cabecera()
+        client, "asistente/mensajes", {"pregunta": "Redacta un mensaje para mi tienda"}, cabecera()
     )
     assert respuesta.status_code == 200
     assert respuesta.json()["modelo"] == "generador-falso"
+
+
+def test_el_asistente_responde_el_saldo_real_de_la_cuenta(client: Client) -> None:
+    respuesta = post_json(
+        client, "asistente/mensajes", {"pregunta": "¿Cuántos créditos tengo?"}, cabecera()
+    )
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["modelo"] == "Tu cuenta"
+    assert datos["respuesta"].startswith("Tienes ")
+    assert "créditos disponibles" in datos["respuesta"]
+
+
+def test_una_pregunta_ajena_no_llega_al_modelo(client: Client, settings: Any) -> None:
+    settings.GENERADOR_TEXTO = "ollama"
+    ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
+    with patch(ruta) as llamada:
+        respuesta = post_json(
+            client, "asistente/mensajes", {"pregunta": "¿Cuál es la capital de Roma?"}, cabecera()
+        )
+    assert respuesta.status_code == 200
+    assert respuesta.json()["respuesta"].startswith("Solo puedo ayudarte con el uso de MassSend")
+    llamada.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -84,7 +108,7 @@ def test_si_ollama_cae_responde_503(client: Client, settings: Any) -> None:
     auth = cabecera()
     ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
     with patch(ruta, side_effect=requests.ConnectionError("detalle-interno")):
-        respuesta = post_json(client, "asistente/mensajes", {"pregunta": "hola"}, auth)
+        respuesta = post_json(client, "asistente/mensajes", REDACTA, auth)
     assert respuesta.status_code == 503
     assert b"detalle-interno" not in respuesta.content
 
@@ -94,7 +118,7 @@ def test_si_ollama_tarda_responde_503(client: Client, settings: Any) -> None:
     auth = cabecera()
     ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
     with patch(ruta, side_effect=requests.Timeout):
-        respuesta = post_json(client, "asistente/mensajes", {"pregunta": "hola"}, auth)
+        respuesta = post_json(client, "asistente/mensajes", REDACTA, auth)
     assert respuesta.status_code == 503
 
 

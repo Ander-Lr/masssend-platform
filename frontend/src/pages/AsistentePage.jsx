@@ -7,8 +7,8 @@ import { claseEntrada } from '../components/ui/Campo'
 // Asistente de IA local con Ollama: la pregunta se procesa en el propio servidor.
 const SUGERENCIAS = [
   '¿Cómo creo una campaña?',
+  '¿Cuántos créditos tengo?',
   '¿Cómo importo mis contactos?',
-  '¿Cómo funcionan los créditos?',
   'Redáctame un mensaje para promocionar un descuento del 20%',
 ]
 // Solo los ultimos turnos viajan como contexto: respuestas rapidas con un modelo pequeno.
@@ -75,7 +75,7 @@ export default function AsistentePage() {
         <div>
           <h1 className="text-[1.4rem] font-bold">Asistente IA</h1>
           <p className="mt-1 text-[0.88rem] text-gray-500">
-            Modelo de IA local ejecutado con Ollama. Pregunta cómo usar MassSend o pide que te redacte un mensaje de campaña.
+            Pregunta cómo usar MassSend o cuántos créditos tienes, o pide que la IA local (Ollama) te redacte un mensaje de campaña.
           </p>
         </div>
         <EstadoModelo estado={estado} />
@@ -104,9 +104,12 @@ export default function AsistentePage() {
               {m.rol === 'assistant' && !m.error && (
                 <div className="mt-2 flex flex-wrap items-center gap-2.5 text-[0.72rem] text-gray-500">
                   <span>{m.latencia ? `${m.modelo} · ${m.latencia} ms` : m.modelo}</span>
-                  <button onClick={() => copiar(m.contenido, idx)} className="p-0 font-bold text-blue-600">
-                    {copiado === idx ? 'Copiado' : 'Copiar para tu campaña'}
-                  </button>
+                  {/* Solo los mensajes redactados por la IA tienen latencia: esos se copian a una campaña. */}
+                  {m.latencia > 0 && (
+                    <button onClick={() => copiar(m.contenido, idx)} className="p-0 font-bold text-blue-600">
+                      {copiado === idx ? 'Copiado' : 'Copiar para tu campaña'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -133,7 +136,7 @@ export default function AsistentePage() {
           {cargando ? 'Esperando...' : 'Enviar'}
         </Boton>
       </form>
-      <p className="mt-2 text-[0.74rem] text-gray-500">El modelo es pequeño y puede equivocarse. Revisa sus respuestas antes de usarlas.</p>
+      <p className="mt-2 text-[0.74rem] text-gray-500">Las preguntas sobre MassSend se responden con la guía y tus datos. Los mensajes los redacta la IA: revísalos antes de usarlos.</p>
     </div>
   )
 }

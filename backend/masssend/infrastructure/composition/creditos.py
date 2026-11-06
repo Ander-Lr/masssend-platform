@@ -14,7 +14,9 @@ from masssend.application.creditos.reservas import (
     ReservarCreditos,
 )
 from masssend.application.envio.puertos import IReservaCreditos
+from masssend.application.ia.puertos import ISaldoCreditos
 from masssend.infrastructure.adapters.creditos.reserva_envio import ReservaCreditosLocal
+from masssend.infrastructure.adapters.creditos.saldo_asistente import SaldoCreditosLocal
 from masssend.infrastructure.adapters.pagos.selector import SelectorPasarelas
 from masssend.infrastructure.composition.root import contenedor as raiz
 from masssend.infrastructure.persistence.creditos.consultas import ConsultasCreditosDjango
@@ -59,6 +61,10 @@ class ContenedorCreditos:
             RepoBilleterasDjango(),
             raiz.unidad_de_trabajo(),
         )
+
+    def saldo_para_asistente(self) -> ISaldoCreditos:
+        """El modulo de IA obtiene aqui el adaptador real."""
+        return SaldoCreditosLocal(ConsultarSaldo(RepoBilleterasDjango()))
 
     def reserva_creditos(self) -> IReservaCreditos:
         """El modulo de envio obtiene aqui el adaptador real."""

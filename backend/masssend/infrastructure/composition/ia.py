@@ -6,6 +6,7 @@ from masssend.application.ia.asistente import ConsultarAsistente, RevisarAsisten
 from masssend.application.ia.puertos import IGeneradorTexto
 from masssend.infrastructure.adapters.ia.falso import GeneradorFalso
 from masssend.infrastructure.adapters.ia.ollama import GeneradorOllama
+from masssend.infrastructure.composition.creditos import contenedor_creditos
 from masssend.infrastructure.composition.root import contenedor as raiz
 
 
@@ -18,7 +19,9 @@ class ContenedorIa:
         )
 
     def consultar(self) -> ConsultarAsistente:
-        return ConsultarAsistente(self._generador(), raiz.reloj())
+        return ConsultarAsistente(
+            self._generador(), raiz.reloj(), contenedor_creditos.saldo_para_asistente()
+        )
 
     def revisar(self) -> RevisarAsistente:
         return RevisarAsistente(self._generador())
