@@ -1,0 +1,39 @@
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import AuthCard from '../../components/auth/AuthCard'
+import AlertBox from '../../components/auth/AlertBox'
+import { completarGoogle } from '../../api/identidad'
+import { useAuth } from '../../context/AuthContext'
+import { rutaDelPaso } from './pasos'
+
+// Google vuelve aqui con ?state=...&code=... y el backend responde el siguiente paso.
+export default function GoogleCallbackPage() {
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const { registrarPaso } = useAuth()
+  const state = params.get('state')
+  const code = params.get('code')
+  const valido = Boolean(state && code && !params.get('error'))
+  const [error, setError] = useState(valido ? '' : 'Google no completó el acceso. Intenta de nuevo.')
+  const procesado = useRef(false)
+
+  useEffect(() => {
+    // El state es de un solo uso: se envia una vez aunque el efecto se repita.
+    if (procesado.current || !valido) return
+    procesado.current = true
+    completarGoogle(state, code)
+      .then(paso => navigate(rutaDelPaso(registrarPaso(paso)), { replace: true }))
+      .catch(err => setError(err.mensajeUsuario))
+  }, [state, code, valido, navigate, registrarPaso])
+
+  return (
+    <AuthCard title="Acceso con Google">
+      {error ? <AlertBox>{error}</AlertBox> : <p className="texto-suave" style={{ textAlign: 'center' }}>Validando tu cuenta de Google...</p>}
+      {error && (
+        <div style={{ textAlign: 'center' }}>
+          <Link className="boton-enlace" to="/login">Volver a iniciar sesión</Link>
+        </div>
+      )}
+    </AuthCard>
+  )
+}
