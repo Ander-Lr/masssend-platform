@@ -45,6 +45,12 @@ BASE_ENV="backend/tests/ci.env"
 SECRETOS="backend/.env.secretos"
 ENV_EXTRA="backend/.env"
 CREDS_WHATSAPP="backend/whatsapp_api/auth_info_baileys/creds.json"
+
+# Baileys crea creds.json al arrancar; solo al vincular con exito guarda "account"
+# (la identidad firmada del dispositivo). "me" aparece apenas se pide un codigo.
+whatsapp_vinculado() {
+  [ -f "$CREDS_WHATSAPP" ] && grep -q '"account":' "$CREDS_WHATSAPP" 2>/dev/null
+}
 MODELO="${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
 
 if [ -t 1 ]; then
@@ -260,7 +266,7 @@ informe_prod() {
     fila "Asistente" "$AMARILLO" "sin modelo" "se descarga al levantar ($MODELO)"
   fi
 
-  if [ -f "$CREDS_WHATSAPP" ]; then fila "WhatsApp" "$VERDE" "vinculado" "sesion guardada"
+  if whatsapp_vinculado; then fila "WhatsApp" "$VERDE" "vinculado" "sesion guardada"
   else fila "WhatsApp" "$AMARILLO" "sin vincular" "escanea el QR con: ./levantar.sh --qr"; fi
 
   fila "Archivos" "$VERDE" "PocketBase" "interno"
@@ -298,7 +304,7 @@ produccion() {
     apagar) compose_prod down --remove-orphans
             info "Contenedores detenidos. Los datos se conservan; vuelve a levantar con ./levantar.sh"; return ;;
     estado) informe_prod; return ;;
-    qr)     if [ -f "$CREDS_WHATSAPP" ]; then info "WhatsApp ya esta vinculado; el registro muestra su estado."; fi
+    qr)     if whatsapp_vinculado; then info "WhatsApp ya esta vinculado; el registro muestra su estado."; fi
             info "Escanea el QR desde WhatsApp > Dispositivos vinculados. Sal con Ctrl+C."
             compose_prod logs -f --tail 60 whatsapp; return ;;
     borrar) aviso "Esto borra la base de datos, los archivos de PocketBase y los modelos de Ollama."

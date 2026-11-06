@@ -40,6 +40,13 @@ $BaseEnv = 'backend/tests/ci.env'
 $Secretos = 'backend/.env.secretos'
 $EnvExtra = 'backend/.env'
 $CredsWhatsapp = 'backend/whatsapp_api/auth_info_baileys/creds.json'
+
+# Baileys crea creds.json al arrancar; solo al vincular con exito guarda "account"
+# (la identidad firmada del dispositivo). "me" aparece apenas se pide un codigo.
+function WhatsApp-Vinculado {
+  $ruta = Ruta $CredsWhatsapp
+  return ((Test-Path -LiteralPath $ruta) -and (Select-String -LiteralPath $ruta -Pattern '"account":' -SimpleMatch -Quiet))
+}
 $script:Modelo = if ($env:OLLAMA_MODEL_CI) { $env:OLLAMA_MODEL_CI } else { 'qwen2.5:0.5b' }
 $Utf8SinBom = New-Object System.Text.UTF8Encoding $false
 
@@ -276,7 +283,7 @@ function Informe-Prod {
   if (Tiene-Modelo) { Fila 'Asistente' 'Green' 'Ollama' "modelo $($script:Modelo)" }
   else { Fila 'Asistente' 'Yellow' 'sin modelo' "se descarga al levantar ($($script:Modelo))" }
 
-  if (Test-Path -LiteralPath (Ruta $CredsWhatsapp)) { Fila 'WhatsApp' 'Green' 'vinculado' 'sesion guardada' }
+  if (WhatsApp-Vinculado) { Fila 'WhatsApp' 'Green' 'vinculado' 'sesion guardada' }
   else { Fila 'WhatsApp' 'Yellow' 'sin vincular' 'escanea el QR con: .\levantar.cmd --qr' }
 
   Fila 'Archivos' 'Green' 'PocketBase' 'interno'
@@ -314,7 +321,7 @@ function Produccion {
     }
     'estado' { Informe-Prod; return }
     'qr' {
-      if (Test-Path -LiteralPath (Ruta $CredsWhatsapp)) { Info 'WhatsApp ya esta vinculado; el registro muestra su estado.' }
+      if (WhatsApp-Vinculado) { Info 'WhatsApp ya esta vinculado; el registro muestra su estado.' }
       Info 'Escanea el QR desde WhatsApp > Dispositivos vinculados. Sal con Ctrl+C.'
       Compose-Prod logs -f --tail 60 whatsapp; return
     }

@@ -53,6 +53,9 @@ let isReady = false;
 let currentQR = null;
 let pairingCode = null;
 let pairingPhone = null;
+// Estado del socket: 'iniciando', 'esperando' (mostro un QR y acepta vincular),
+// 'abierto' (vinculado) o 'cerrado' (esperando la reconexion programada).
+let estadoConexion = 'cerrado';
 let sock = null;
 let reconnectTimer = null;
 
@@ -117,8 +120,41 @@ function scheduleReconnect(delay = 5000) {
     }, delay);
 }
 
+// Borra la sesion guardada. La carpeta es un volumen montado y no se puede eliminar:
+// se borra su contenido, archivo por archivo.
+function borrarCredenciales() {
+    try {
+        for (const f of fs.readdirSync('./auth_info_baileys')) {
+            fs.rmSync(`./auth_info_baileys/${f}`, { recursive: true, force: true });
+        }
+    } catch (e) {
+        console.error('[WhatsApp] No se pudieron borrar las credenciales:', e.message);
+    }
+}
+
+// Reconecta ya, sin esperar la reconexion programada.
+function reiniciarAhora() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    return startClient();
+}
+
+// Pide el codigo de vinculacion. Solo funciona con un socket que ya mostro un QR.
+async function pedirCodigo() {
+    const code = await sock.requestPairingCode(pairingPhone);
+    pairingCode = code;
+    currentQR = null;
+    console.log(`[WhatsApp] Código de vinculación: ${code}`);
+    return code;
+}
+
 // ─── Crear cliente WhatsApp (Baileys) ─────────────────────────────────
 async function startClient() {
+    estadoConexion = 'iniciando';
+    // Un socket nuevo necesita su propio codigo: el anterior deja de servir.
+    pairingCode = null;
     // Cerrar socket anterior si existe
     if (sock) {
         try { sock.end(new Error('Reiniciando')); } catch (_) {}
@@ -148,9 +184,12 @@ async function startClient() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                currentQR = qr;
-                pairingCode = null;
+                estadoConexion = 'esperando';
                 isReady = false;
+            }
+            // Con un codigo ya pedido, WhatsApp sigue enviando QR: se ignoran.
+            if (qr && !pairingCode) {
+                currentQR = qr;
                 console.log('====================================================');
                 console.log('ESCANEA ESTE CODIGO QR CON TU WHATSAPP');
                 console.log('====================================================');
@@ -158,21 +197,19 @@ async function startClient() {
                 // Notificar a React via WebSocket: nuevo QR disponible
                 broadcast('qr_update', { qr, ready: false });
 
+                // Se pidio vincular mientras la conexion estaba cerrada: ahora si se puede.
                 if (pairingPhone) {
                     try {
                         console.log(`[WhatsApp] Solicitando código de vinculación para ${pairingPhone}...`);
-                        const code = await sock.requestPairingCode(pairingPhone);
-                        pairingCode = code;
-                        currentQR = null;
-                        console.log(`[WhatsApp] Código de vinculación: ${code}`);
+                        await pedirCodigo();
                     } catch (e) {
                         console.error('[WhatsApp] Error al pedir código:', e.message);
-                        pairingPhone = null;
                     }
                 }
             }
 
             if (connection === 'close') {
+                estadoConexion = 'cerrado';
                 isReady = false;
                 const error = lastDisconnect?.error;
                 const statusCode = (error instanceof Boom) ? error.output.statusCode : 0;
@@ -182,7 +219,7 @@ async function startClient() {
 
                 if (statusCode === DisconnectReason.loggedOut) {
                     console.log('[WhatsApp] Sesión cerrada. Borrando credenciales...');
-                    try { fs.rmSync('./auth_info_baileys', { recursive: true, force: true }); } catch (_) {}
+                    borrarCredenciales();
                     scheduleReconnect(2000);
                 } else if (statusCode === DisconnectReason.connectionReplaced) {
                     console.log('[WhatsApp] Conexión reemplazada por otra sesión.');
@@ -193,6 +230,7 @@ async function startClient() {
             }
 
             if (connection === 'open') {
+                estadoConexion = 'abierto';
                 isReady = true;
                 currentQR = null;
                 pairingCode = null;
@@ -400,20 +438,20 @@ app.post('/api/request-pairing', async (req, res) => {
     pairingPhone = cleanPhone;
     pairingCode = null;
 
-    if (sock) {
+    // Con un socket que muestra QR, el codigo sale al instante.
+    if (sock && estadoConexion === 'esperando') {
         try {
-            const code = await sock.requestPairingCode(cleanPhone);
-            pairingCode = code;
-            currentQR = null;
-            console.log(`[WhatsApp] Código de vinculación: ${code}`);
+            const code = await pedirCodigo();
             return res.json({ success: true, code });
         } catch (e) {
-            pairingPhone = null;
-            return res.status(500).json({ success: false, error: 'No se pudo obtener el código: ' + e.message });
+            console.error('[WhatsApp] El socket no acepto la vinculación, se reinicia:', e.message);
         }
     }
 
-    res.json({ success: true, message: 'Numero guardado. El codigo aparecera cuando el cliente inicie.' });
+    // Conexion cerrada, reconectando o rechazada: se reconecta ya y el codigo se pide
+    // en cuanto el socket nuevo este listo. El panel lo obtiene consultando el estado.
+    if (estadoConexion !== 'iniciando') reiniciarAhora().catch(() => {});
+    res.json({ success: true, message: 'El código se está generando. Aparecerá en unos segundos.' });
 });
 
 app.post('/api/logout', async (req, res) => {
@@ -427,14 +465,8 @@ app.post('/api/logout', async (req, res) => {
         res.json({ success: true, message: 'Desconectando...' });
 
         try { if (sock) await sock.logout(); } catch (e) {}
-        // La carpeta puede ser un punto de montaje de Docker (no se puede
-        // eliminar la carpeta en sí): se borra su CONTENIDO archivo por
-        // archivo, que es lo que realmente invalida la sesión.
-        try {
-            for (const f of fs.readdirSync('./auth_info_baileys')) {
-                try { fs.rmSync(`./auth_info_baileys/${f}`, { recursive: true, force: true }); } catch (_) {}
-            }
-        } catch (_) {}
+        // Borrar el contenido de la sesion es lo que realmente la invalida.
+        borrarCredenciales();
 
         setTimeout(startClient, 2000);
     } catch (err) {

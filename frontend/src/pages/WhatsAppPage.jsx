@@ -80,7 +80,8 @@ export default function WhatsAppPage() {
     },
   })
 
-  const codigoVisible = conectado ? '' : codigo || codigoGlobal || ''
+  // El gateway renueva el codigo si la conexion se reinicia: manda el que informa el servidor.
+  const codigoVisible = conectado ? '' : codigoGlobal || codigo || ''
   const partes = codigoVisible ? [codigoVisible.slice(0, 4), codigoVisible.slice(4)] : ['----', '----']
 
   return (
