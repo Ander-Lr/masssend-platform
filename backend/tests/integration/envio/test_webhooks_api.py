@@ -219,6 +219,7 @@ def test_whatsapp_con_el_canal_falso() -> None:
     assert admin.cliente.get("/api/v1/whatsapp/estado").json() == {
         "conectado": True,
         "codigo_vinculacion": None,
+        "qr": None,
     }
     respuesta = admin.cliente.post(
         "/api/v1/whatsapp/vinculacion", {"telefono": "0991112222"}, content_type="application/json"
@@ -249,11 +250,21 @@ def test_whatsapp_contra_el_gateway(monkeypatch: pytest.MonkeyPatch, settings: A
     settings.WHATSAPP_API_URL = "http://gateway:3001"
     gateway = Gateway(monkeypatch)
     admin = staff()
-    gateway.respuestas["/api/qr"] = (200, {"ready": False, "pairing_code": "XY12-ZW34"})
+    gateway.respuestas["/api/qr"] = (200, {"ready": False, "qr": "2@abc,def", "pairing_code": None})
+    assert admin.cliente.get("/api/v1/whatsapp/estado").json() == {
+        "conectado": False,
+        "codigo_vinculacion": None,
+        "qr": "2@abc,def",
+    }
+    con_codigo = {"ready": False, "qr": "2@viejo", "pairing_code": "XY12-ZW34"}
+    gateway.respuestas["/api/qr"] = (200, con_codigo)
     assert admin.cliente.get("/api/v1/whatsapp/estado").json() == {
         "conectado": False,
         "codigo_vinculacion": "XY12-ZW34",
+        "qr": None,
     }
+    gateway.respuestas["/api/qr"] = (200, {"ready": True, "qr": "2@viejo"})
+    assert admin.cliente.get("/api/v1/whatsapp/estado").json()["qr"] is None
     gateway.respuestas["/api/request-pairing"] = (200, {"success": True, "code": "AB12-CD34"})
     respuesta = admin.cliente.post(
         "/api/v1/whatsapp/vinculacion",

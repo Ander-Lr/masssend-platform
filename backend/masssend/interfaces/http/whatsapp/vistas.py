@@ -23,7 +23,11 @@ class EstadoVista(VistaStaff):
         cuenta_actual(request)
         estado = envio.consultar_whatsapp().ejecutar()
         return Response(
-            {"conectado": estado.conectado, "codigo_vinculacion": estado.codigo_vinculacion}
+            {
+                "conectado": estado.conectado,
+                "codigo_vinculacion": estado.codigo_vinculacion,
+                "qr": estado.qr,
+            }
         )
 
 

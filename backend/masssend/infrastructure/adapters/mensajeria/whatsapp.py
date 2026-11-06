@@ -90,7 +90,11 @@ class ConexionWhatsApp:
 
     def estado(self) -> EstadoConexion:
         datos = _json(self._pedir("GET", "/api/qr"))
-        return EstadoConexion(bool(datos.get("ready")), datos.get("pairing_code") or None)
+        conectado = bool(datos.get("ready"))
+        codigo = datos.get("pairing_code") or None
+        # Con un codigo pedido, el QR ya no sirve: se muestra uno u otro.
+        qr = None if conectado or codigo else (datos.get("qr") or None)
+        return EstadoConexion(conectado, codigo, qr)
 
     def solicitar_vinculacion(self, telefono: str) -> str | None:
         respuesta = self._pedir("POST", "/api/request-pairing", json={"phone": telefono})

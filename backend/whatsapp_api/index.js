@@ -53,6 +53,10 @@ let isReady = false;
 let currentQR = null;
 let pairingCode = null;
 let pairingPhone = null;
+// Una peticion de codigo vale 3 minutos: despues se olvida y vuelve el QR.
+// Asi no se generan codigos (ni avisos al telefono) sin fin si no se completa.
+const VIGENCIA_PETICION_MS = 3 * 60 * 1000;
+let pairingHasta = 0;
 // Estado del socket: 'iniciando', 'esperando' (mostro un QR y acepta vincular),
 // 'abierto' (vinculado) o 'cerrado' (esperando la reconexion programada).
 let estadoConexion = 'cerrado';
@@ -197,6 +201,10 @@ async function startClient() {
                 // Notificar a React via WebSocket: nuevo QR disponible
                 broadcast('qr_update', { qr, ready: false });
 
+                if (pairingPhone && Date.now() > pairingHasta) {
+                    console.log('[WhatsApp] La petición de código venció: se vuelve al QR.');
+                    pairingPhone = null;
+                }
                 // Se pidio vincular mientras la conexion estaba cerrada: ahora si se puede.
                 if (pairingPhone) {
                     try {
@@ -437,6 +445,7 @@ app.post('/api/request-pairing', async (req, res) => {
 
     pairingPhone = cleanPhone;
     pairingCode = null;
+    pairingHasta = Date.now() + VIGENCIA_PETICION_MS;
 
     // Con un socket que muestra QR, el codigo sale al instante.
     if (sock && estadoConexion === 'esperando') {

@@ -142,6 +142,8 @@ class IHistorialMensajes(Protocol):
 class EstadoConexion:
     conectado: bool
     codigo_vinculacion: str | None = None
+    # Texto del QR que muestra WhatsApp mientras espera; el navegador lo dibuja.
+    qr: str | None = None
 
 
 class IConexionWhatsApp(Protocol):
