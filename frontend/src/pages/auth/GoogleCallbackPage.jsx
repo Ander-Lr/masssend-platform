@@ -20,8 +20,11 @@ export default function GoogleCallbackPage() {
 
   useEffect(() => {
     // El state es de un solo uso: se envia una vez aunque el efecto se repita.
-    if (procesado.current || !valido) return
+    if (procesado.current) return
     procesado.current = true
+    // El codigo de Google es de un solo uso: se quita de la barra de direcciones.
+    window.history.replaceState(null, '', '/auth/google/callback')
+    if (!valido) return
     completarGoogle(state, code)
       .then(paso => navigate(rutaDelPaso(registrarPaso(paso)), { replace: true }))
       .catch(err => setError(err.mensajeUsuario))

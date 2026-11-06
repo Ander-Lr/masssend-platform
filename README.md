@@ -216,10 +216,10 @@ El script indica al final qué variables hay que cambiar en el entorno de Postma
 ### Acceso con Google
 
 1. En Google Cloud crea un ID de cliente OAuth de tipo *Aplicación web*.
-2. Agrega las URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback` (para Postman) y `http://localhost:5173/auth/google/callback` (para la aplicación web).
+2. Agrega la URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback`.
 3. Pega el ID y el secreto en `backend/.env.google`.
-4. Para entrar con Google desde la aplicación web, escribe `GOOGLE_RETORNO_V1=http://localhost:5173/auth/google/callback` en `backend/.env.google`. Para Postman deja ese valor vacío.
-5. En Postman cambia `modoGoogle` a `google`. La petición **Iniciar Google** devuelve una URL que se abre en el navegador antes de 10 minutos. El navegador muestra un `token_desafio` con el que se continúa el doble factor en Postman. La petición **Completar Google** se omite en este modo.
+4. Desde la aplicación web, el botón **Continuar con Google** hace todo solo: Google vuelve a la API, la API reenvía el navegador a la web y la web te lleva a activar o escribir el doble factor.
+5. En Postman cambia `modoGoogle` a `google`. La petición **Iniciar Google** devuelve una URL que se abre en el navegador antes de 10 minutos. Al volver, el navegador entra a la aplicación web y completa ahí el acceso. La petición **Completar Google** se omite en este modo.
 
 ### PayPal Sandbox
 

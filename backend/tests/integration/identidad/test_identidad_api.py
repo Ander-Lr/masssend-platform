@@ -410,6 +410,45 @@ def test_google_crea_cuenta_y_aun_exige_doble_factor(client: Client) -> None:
 
 
 @pytest.mark.usefixtures("google_falso")
+def test_el_navegador_que_vuelve_de_google_pasa_a_la_web_sin_gastar_el_estado(
+    client: Client, settings: Any
+) -> None:
+    settings.FRONTEND_URL = "http://localhost:5173/"
+    url = client.get("/api/v1/auth/google").json()["url"]
+    estado = parse_qs(urlparse(url).query)["state"][0]
+    respuesta = client.get(
+        "/api/v1/auth/google/callback",
+        {"state": estado, "code": "ana"},
+        HTTP_ACCEPT="text/html,application/xhtml+xml,*/*;q=0.8",
+    )
+    assert respuesta.status_code == 302
+    destino = urlparse(respuesta["Location"])
+    assert f"{destino.scheme}://{destino.netloc}{destino.path}" == (
+        "http://localhost:5173/auth/google/callback"
+    )
+    assert parse_qs(destino.query) == {"state": [estado], "code": ["ana"]}
+    # La web completa el acceso con el mismo state, que sigue vigente.
+    final = client.get(
+        "/api/v1/auth/google/callback",
+        {"state": estado, "code": "ana"},
+        HTTP_ACCEPT="application/json, application/problem+json",
+    )
+    assert final.status_code == 200
+    assert final.json()["siguiente"] == "activar_mfa"
+
+
+@pytest.mark.usefixtures("google_falso")
+def test_si_el_usuario_cancela_en_google_tambien_vuelve_a_la_web(client: Client) -> None:
+    respuesta = client.get(
+        "/api/v1/auth/google/callback",
+        {"error": "access_denied", "state": "x"},
+        HTTP_ACCEPT="text/html",
+    )
+    assert respuesta.status_code == 302
+    assert "error=access_denied" in respuesta["Location"]
+
+
+@pytest.mark.usefixtures("google_falso")
 def test_google_rechaza_un_estado_falso(client: Client) -> None:
     respuesta = client.get("/api/v1/auth/google/callback", {"state": "falso", "code": "ana"})
     es_problema(respuesta, 401, "no_autenticado")

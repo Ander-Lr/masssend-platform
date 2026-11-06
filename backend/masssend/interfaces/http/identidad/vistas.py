@@ -3,6 +3,8 @@
 from dataclasses import asdict
 from typing import Any
 
+from django.conf import settings
+from django.http import HttpResponseRedirect
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -115,8 +117,24 @@ class GoogleVista(VistaPublica):
         return Response({"url": identidad.iniciar_google().ejecutar()})
 
 
+def abre_un_navegador(request: Request) -> bool:
+    """Google redirige el navegador, que pide HTML; la web y Postman piden JSON."""
+    return "text/html" in request.headers.get("Accept", "")
+
+
 class GoogleCallbackVista(VistaPublica):
-    def get(self, request: Request) -> Response:
+    def perform_content_negotiation(self, request: Request, force: bool = False) -> Any:
+        # Un navegador que solo acepta HTML igual debe llegar a la redireccion.
+        forzar = force or abre_un_navegador(request)
+        return super().perform_content_negotiation(request, force=forzar)
+
+    def get(self, request: Request) -> Response | HttpResponseRedirect:
+        # El navegador llega aqui desde Google: se le envia a la web, que completa el
+        # acceso llamando a esta misma ruta con JSON. El state no se consume en este paso.
+        if abre_un_navegador(request):
+            web = settings.FRONTEND_URL.rstrip("/")
+            consulta = request.META.get("QUERY_STRING", "")
+            return HttpResponseRedirect(f"{web}/auth/google/callback?{consulta}")
         datos = validar(s.GoogleCallback, request.query_params)
         return respuesta_paso(
             identidad.completar_google().ejecutar(datos["state"], datos["code"])
