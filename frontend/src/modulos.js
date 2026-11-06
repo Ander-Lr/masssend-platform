@@ -3,6 +3,14 @@
 export const MODULOS = [
   { id: 'inicio', ruta: '/', label: 'Inicio' },
   {
+    id: 'contactos', ruta: '/contactos', label: 'Contactos',
+    titulo: 'Contactos', desc: 'Gestiona tu lista de clientes, etiquetas y bajas.', color: '#10b981',
+  },
+  {
+    id: 'importar', ruta: '/importar', label: 'Importar CSV',
+    titulo: 'Importar CSV', desc: 'Carga cientos de contactos desde un archivo.', color: '#7c3aed',
+  },
+  {
     id: 'creditos', ruta: '/creditos', label: 'Créditos',
     titulo: 'Créditos', desc: 'Consulta tu saldo y compra paquetes con PayPal o PayPhone.', color: '#f59e0b',
   },

@@ -13,6 +13,8 @@ import GoogleCallbackPage from './pages/auth/GoogleCallbackPage'
 import InicioPage from './pages/InicioPage'
 import SeguridadPage from './pages/SeguridadPage'
 import CreditosPage from './pages/CreditosPage'
+import ContactosPage from './pages/ContactosPage'
+import ImportarContactosPage from './pages/ImportarContactosPage'
 import RetornoPagoPage from './pages/RetornoPagoPage'
 import AsistentePage from './pages/AsistentePage'
 import { recordarDestino } from './pages/auth/pasos'
@@ -62,6 +64,8 @@ function Rutas() {
 
       <Route element={<Privada><Layout /></Privada>}>
         <Route index element={<InicioPage />} />
+        <Route path="contactos" element={<ContactosPage />} />
+        <Route path="importar" element={<ImportarContactosPage />} />
         <Route path="creditos" element={<CreditosPage />} />
         <Route path="asistente" element={<AsistentePage />} />
         <Route path="seguridad" element={<SeguridadPage />} />
