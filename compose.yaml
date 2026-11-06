@@ -8,16 +8,56 @@
 #   solo el backend publica su puerto en el host
 #
 # Perfiles:
-#   real  sistema completo, con WhatsApp, Ollama, PocketBase y Gmail.
+#   real  sistema completo, con WhatsApp, Ollama, PocketBase y datos persistentes.
 #   ci    API con adaptadores falsos y datos temporales, para Postman.
-x-adaptadores-reales: &adaptadores-reales
+#
+# El perfil real no necesita backend/.env: levantar.sh genera los secretos
+# internos en backend/.env.secretos y suma los archivos de cada servicio
+# (backend/.env.gmail, .env.google, .env.paypal, .env.payphone, .env.ia) con
+# --env-file. Sin .env.gmail los correos quedan en Mailpit; sin las claves de
+# Google o de una pasarela, esa funcion responde "no configurado" (nunca se simula).
+x-entorno-real: &entorno-real
+  SECRET_KEY: "${SECRET_KEY:?Falta SECRET_KEY: ejecuta ./levantar.sh, que la genera}"
+  JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Falta JWT_SECRET_KEY: ejecuta ./levantar.sh, que la genera}"
+  WHATSAPP_WEBHOOK_TOKEN: "${WHATSAPP_WEBHOOK_TOKEN:?Falta WHATSAPP_WEBHOOK_TOKEN: ejecuta ./levantar.sh}"
+  # Dentro de la red Docker los servicios se llaman por su nombre
+  WHATSAPP_API_URL: "http://whatsapp:3001"
+  OLLAMA_URL: "http://ollama:11434"
+  OLLAMA_MODEL: "${OLLAMA_MODEL_CI:-qwen2.5:0.5b}"
+  POCKETBASE_URL: "http://pocketbase:8080"
+  POCKETBASE_PUBLIC_URL: "http://pocketbase:8080"
+  POCKETBASE_ADMIN_EMAIL: "${PB_SUPERUSER_EMAIL:?Falta PB_SUPERUSER_EMAIL: ejecuta ./levantar.sh}"
+  POCKETBASE_ADMIN_PASSWORD: "${PB_SUPERUSER_PASSWORD:?Falta PB_SUPERUSER_PASSWORD: ejecuta ./levantar.sh}"
+  DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD: ejecuta ./levantar.sh}@postgres:5432/${POSTGRES_DB:-masssend_db}"
+  DB_SSL_REQUIRE: "False"
+  DEBUG: "False"
+  REDIS_URL: "redis://redis:6379/0"
   CANAL_MENSAJERIA: whatsapp
   COLA_ENVIOS: celery
   ALMACEN_ARCHIVOS: pocketbase
   GENERADOR_TEXTO: ollama
+  # Pagos y Google siempre reales: sin credenciales responden "no configurado".
   PASARELA_PAGO_FAKE: "0"
-  DESTINO_CORREO: gmail
   PROVEEDOR_GOOGLE: google
+  # Con backend/.env.gmail salen por Gmail; si no, se quedan en Mailpit.
+  DESTINO_CORREO: "${DESTINO_CORREO_CI:-mailpit}"
+  EMAIL_USER: "${EMAIL_USER:-}"
+  EMAIL_APP_PASSWORD: "${EMAIL_APP_PASSWORD:-}"
+  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+  GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+  GOOGLE_RETORNO_V1: "${GOOGLE_RETORNO_V1:-}"
+  PAYPAL_CLIENT_ID: "${PAYPAL_CLIENT_ID:-}"
+  PAYPAL_CLIENT_SECRET: "${PAYPAL_CLIENT_SECRET:-}"
+  PAYPAL_BASE_URL: "${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}"
+  PAYPHONE_TOKEN: "${PAYPHONE_TOKEN:-}"
+  PAYPHONE_STORE_ID: "${PAYPHONE_STORE_ID:-}"
+  PAYPHONE_BASE_URL: "${PAYPHONE_BASE_URL:-https://pay.payphonetodoesposible.com}"
+  PAYPHONE_RETORNO_V1: "${PAYPHONE_RETORNO_V1:-}"
+
+# backend/.env es opcional: sirve para ajustes extra (ALLOWED_HOSTS, FRONTEND_URL...).
+x-env-opcional: &env-opcional
+  - path: ./backend/.env
+    required: false
 
 x-backend-ci: &backend-ci
   build:
@@ -74,21 +114,26 @@ services:
     profiles: [real]
     build:
       context: ./backend
-    container_name: masssend-backend
     ports:
       - "${API_PORT:-8000}:8000"
-    env_file:
-      - ./backend/.env
+    env_file: *env-opcional
     environment:
-      # Dentro de la red Docker los servicios se llaman por su nombre
-      WHATSAPP_API_URL: "http://whatsapp:3001"
-      OLLAMA_URL: "http://ollama:11434"
-      POCKETBASE_URL: "http://pocketbase:8080"
-      DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
-      DB_SSL_REQUIRE: "False"
-      DEBUG: "False"
-      REDIS_URL: "redis://redis:6379/0"
-      <<: *adaptadores-reales
+      <<: *entorno-real
+      # Administrador inicial; levantar.sh lo crea con la clave de backend/.env.secretos.
+      DJANGO_SUPERUSER_USERNAME: "${ADMIN_EMAIL:-admin@masssend.local}"
+      DJANGO_SUPERUSER_EMAIL: "${ADMIN_EMAIL:-admin@masssend.local}"
+      DJANGO_SUPERUSER_PASSWORD: "${ADMIN_PASSWORD:-}"
+    # Sano cuando ya migro y responde; los workers esperan esto para no ver tablas faltantes.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import http.client as h; c=h.HTTPConnection('localhost',8000,timeout=3); c.request('GET','/api/v1/salud'); exit(0 if c.getresponse().status<500 else 1)"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
     volumes:
       - ./backend/media:/app/media
     depends_on:
@@ -109,24 +154,16 @@ services:
     profiles: [real]
     build:
       context: ./backend
-    container_name: masssend-email-worker
     command: ["python", "-m", "masssend.interfaces.workers.tareas_correo"]
-    env_file:
-      - ./backend/.env
-    environment:
-      WHATSAPP_API_URL: "http://whatsapp:3001"
-      OLLAMA_URL: "http://ollama:11434"
-      POCKETBASE_URL: "http://pocketbase:8080"
-      DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
-      DB_SSL_REQUIRE: "False"
-      DEBUG: "False"
-      REDIS_URL: "redis://redis:6379/0"
-      <<: *adaptadores-reales
+    env_file: *env-opcional
+    environment: *entorno-real
     volumes:
       - ./backend/media:/app/media
     depends_on:
-      - backend
-      - postgres
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     networks:
       - masssend_network
     restart: unless-stopped
@@ -137,21 +174,14 @@ services:
     profiles: [real]
     build:
       context: ./backend
-    container_name: masssend-envio-worker
     command: ["python", "-m", "masssend.interfaces.workers.tareas_envio"]
-    env_file:
-      - ./backend/.env
-    environment:
-      WHATSAPP_API_URL: "http://whatsapp:3001"
-      POCKETBASE_URL: "http://pocketbase:8080"
-      DATABASE_URL: "postgres://${POSTGRES_USER:-masssend_user}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}@postgres:5432/${POSTGRES_DB:-masssend_db}"
-      DB_SSL_REQUIRE: "False"
-      DEBUG: "False"
-      REDIS_URL: "redis://redis:6379/0"
-      <<: *adaptadores-reales
+    env_file: *env-opcional
+    environment: *entorno-real
     depends_on:
-      - backend
-      - postgres
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     networks:
       - masssend_network
     restart: unless-stopped
@@ -161,11 +191,10 @@ services:
     profiles: [real]
     build:
       context: ./backend/whatsapp_api
-    container_name: masssend-whatsapp
     environment:
       PORT: "3001"
       DJANGO_API_URL: "http://backend:8000"
-      WHATSAPP_WEBHOOK_TOKEN: "${WHATSAPP_WEBHOOK_TOKEN:?Define WHATSAPP_WEBHOOK_TOKEN en backend/.env y usa --env-file backend/.env}"
+      WHATSAPP_WEBHOOK_TOKEN: "${WHATSAPP_WEBHOOK_TOKEN:?Falta WHATSAPP_WEBHOOK_TOKEN: ejecuta ./levantar.sh}"
     volumes:
       # La sesión de WhatsApp se conserva entre reinicios (no re-escanear QR)
       - ./backend/whatsapp_api/auth_info_baileys:/app/auth_info_baileys
@@ -177,7 +206,6 @@ services:
   ollama:
     profiles: [real]
     image: ollama/ollama:latest
-    container_name: masssend-ollama
     volumes:
       - masssend_ollama_models:/root/.ollama
     networks:
@@ -191,10 +219,9 @@ services:
       context: ./infra/pocketbase
       args:
         PB_VERSION: "0.39.8"
-    container_name: masssend-pocketbase
     environment:
-      PB_SUPERUSER_EMAIL: "${PB_SUPERUSER_EMAIL:?Define PB_SUPERUSER_EMAIL en backend/.env y usa --env-file backend/.env}"
-      PB_SUPERUSER_PASSWORD: "${PB_SUPERUSER_PASSWORD:?Define PB_SUPERUSER_PASSWORD en backend/.env y usa --env-file backend/.env}"
+      PB_SUPERUSER_EMAIL: "${PB_SUPERUSER_EMAIL:?Falta PB_SUPERUSER_EMAIL: ejecuta ./levantar.sh}"
+      PB_SUPERUSER_PASSWORD: "${PB_SUPERUSER_PASSWORD:?Falta PB_SUPERUSER_PASSWORD: ejecuta ./levantar.sh}"
     volumes:
       - masssend_pocketbase_data:/pb/pb_data
     networks:
@@ -205,11 +232,10 @@ services:
   postgres:
     profiles: [real]
     image: postgres:15-alpine
-    container_name: masssend-postgres
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-masssend_db}"
       POSTGRES_USER: "${POSTGRES_USER:-masssend_user}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en backend/.env y usa --env-file backend/.env}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD: ejecuta ./levantar.sh}"
     volumes:
       - masssend_postgres_data:/var/lib/postgresql/data
     networks:
@@ -287,9 +313,10 @@ services:
       - masssend_network
     restart: unless-stopped
 
-  # Captura los correos; Postman lee los códigos desde su API.
+  # Captura los correos; Postman lee los códigos desde su API. En real recibe
+  # los correos mientras no exista backend/.env.gmail.
   mailpit:
-    profiles: [ci]
+    profiles: [ci, real]
     image: axllent/mailpit:v1.27
     ports:
       - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
@@ -300,7 +327,7 @@ services:
   # Pagina local en el dominio registrado en PayPhone: abre el formulario de
   # pago y muestra el id del retorno, mientras no exista el frontend.
   pasarela-local:
-    profiles: [ci]
+    profiles: [ci, real]
     image: nginx:1.27-alpine
     volumes:
       - ./infra/pasarela-local/index.html:/usr/share/nginx/html/index.html:ro

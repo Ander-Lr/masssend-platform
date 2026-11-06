@@ -35,8 +35,8 @@ Todo el proyecto corre en contenedores, así que no hace falta instalar Python, 
 |-------------|----------------|-----|-------------|
 | Git | 2.30 | Clonar el repositorio | Sí |
 | Docker Engine o Docker Desktop | 24 | Ejecutar los contenedores | Sí |
-| Docker Compose | v2 (comando `docker compose`) | Orquestar los servicios | Sí |
-| Bash | 4 | Ejecutar `levantar.sh` | Sí |
+| Docker Compose | v2.24 (comando `docker compose`) | Orquestar los servicios | Sí |
+| Bash 4 (Linux/macOS) o PowerShell 5.1 (Windows) | — | Ejecutar `levantar.sh` o `levantar.cmd` | Sí |
 | Postman Desktop | 10 | Probar la API manualmente | Recomendada |
 | GNU make | 4 | Ejecutar las pruebas automatizadas | Opcional |
 | Postman CLI | 1.x | Ejecutar `make e2e` | Opcional |
@@ -57,11 +57,7 @@ Si alguno está ocupado, se puede cambiar con las variables `API_PORT`, `MAILPIT
 
 - **Linux:** instala Docker Engine y el plugin de Compose desde la documentación oficial de Docker. Agrega tu usuario al grupo `docker` (`sudo usermod -aG docker $USER`) y vuelve a iniciar sesión.
 - **macOS:** instala Docker Desktop. Bash ya viene incluido.
-- **Windows:** instala Docker Desktop con el backend WSL 2 y ejecuta todos los comandos desde una terminal de WSL (Ubuntu) o desde Git Bash. Antes de clonar, configura Git para no convertir los saltos de línea, porque de lo contrario `levantar.sh` falla:
-
-  ```bash
-  git config --global core.autocrlf input
-  ```
+- **Windows:** instala Docker Desktop con el backend WSL 2 y déjalo abierto. Desde PowerShell o CMD usa `.\levantar.cmd` con las mismas opciones que `levantar.sh` (no hace falta cambiar la política de ejecución). También puedes usar `levantar.sh` desde WSL o Git Bash; `.gitattributes` fija los saltos de línea de cada script al clonar.
 
 Comprueba que todo esté instalado:
 
@@ -90,11 +86,14 @@ cd masssend-platform
 chmod +x levantar.sh
 ```
 
-**Paso 3. Levantar el proyecto**
+**Paso 3. Levantar el proyecto en modo prueba**
 
 ```bash
-./levantar.sh
+./levantar.sh --prueba          # Linux, macOS, WSL
+.\levantar.cmd --prueba         # Windows (PowerShell o CMD)
 ```
+
+Sin `--prueba` el script levanta el sistema en producción (sección 5).
 
 La primera vez tarda varios minutos porque descarga las imágenes y construye el backend. Al terminar, el script muestra las direcciones de la API, de Mailpit y de la página de pagos, junto con la cuenta staff de prueba.
 
@@ -111,27 +110,29 @@ La respuesta debe indicar que la base de datos y la caché están operativas.
 **Paso 5. Apagar**
 
 ```bash
-./levantar.sh --apagar
+./levantar.sh --prueba --apagar
 ```
 
 La base de datos de prueba vive en memoria, así que al apagar se borran todos los datos.
 
 ### Opciones del script
 
+En Windows se usan las mismas opciones con `.\levantar.cmd`.
+
 | Comando | Qué hace |
 |---------|----------|
-| `./levantar.sh` | Construye lo que cambió y levanta todo |
-| `./levantar.sh --limpio` | Borra la base de prueba y empieza de cero |
-| `./levantar.sh --ia` | Agrega el asistente de IA con Ollama |
-| `./levantar.sh --sin paypal` | Ignora una integración aunque esté configurada |
-| `./levantar.sh --actualizar` | Trae lo último de `origin/main` antes de levantar |
-| `./levantar.sh --estado` | Muestra los contenedores y las integraciones detectadas |
-| `./levantar.sh --apagar` | Detiene todo y borra los datos de prueba |
+| `./levantar.sh --prueba` | Construye lo que cambió y levanta el modo prueba |
+| `./levantar.sh --prueba --limpio` | Borra la base de prueba y empieza de cero |
+| `./levantar.sh --prueba --ia` | Agrega el asistente de IA con Ollama |
+| `./levantar.sh --prueba --sin paypal` | Ignora una integración aunque esté configurada |
+| `./levantar.sh --prueba --actualizar` | Trae lo último de `origin/main` antes de levantar |
+| `./levantar.sh --prueba --estado` | Muestra los contenedores y las integraciones detectadas |
+| `./levantar.sh --prueba --apagar` | Detiene todo y borra los datos de prueba |
 | `./levantar.sh --ayuda` | Muestra la ayuda completa |
 
 ### Sin el script
 
-Si no se puede usar Bash, el mismo entorno se levanta con Compose:
+El mismo entorno se levanta directamente con Compose:
 
 ```bash
 docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci up --build -d --wait
@@ -159,7 +160,7 @@ Notas:
 
 - Los archivos de muestra que usan las colecciones están en `postman/archivos/`. Si Postman no los encuentra, configura esa carpeta como directorio de trabajo en *Settings > General > Working directory*.
 - Los códigos de verificación llegan a Mailpit (`http://localhost:8025`) y las colecciones los leen solas.
-- La colección 05 se ejecuta una vez por arranque, porque activa el doble factor de la cuenta staff. Para repetirla, usa `./levantar.sh --limpio`.
+- La colección 05 se ejecuta una vez por arranque, porque activa el doble factor de la cuenta staff. Para repetirla, usa `./levantar.sh --prueba --limpio`.
 - Cuenta staff de prueba: `staff@prueba.local` con clave `clave-larga-123`. Solo existe en este entorno.
 - Para el doble factor se usa Google Authenticator o cualquier aplicación TOTP.
 
@@ -167,12 +168,12 @@ Notas:
 
 ## 4. Integraciones reales opcionales
 
-Cada integración tiene una plantilla `backend/.env.<nombre>.example`. Para activarla, se copia como `backend/.env.<nombre>`, se completan sus valores y se vuelve a ejecutar `./levantar.sh`, que la detecta y la carga sola. Esos archivos nunca se suben al repositorio.
+Cada integración tiene una plantilla `backend/.env.<nombre>.example`. Para activarla, se copia como `backend/.env.<nombre>`, se completan sus valores y se vuelve a ejecutar el script, que la detecta y la carga sola. Los mismos archivos sirven en producción (`./levantar.sh`) y en modo prueba (`./levantar.sh --prueba`). Esos archivos nunca se suben al repositorio.
 
 ```bash
 cp backend/.env.gmail.example backend/.env.gmail
 # editar backend/.env.gmail con tus valores
-./levantar.sh
+./levantar.sh --prueba
 ```
 
 El script indica al final qué variables hay que cambiar en el entorno de Postman. Después de cambiarlas, guarda el entorno con Ctrl+S.
@@ -221,10 +222,10 @@ Cada pasarela se activa por separado: activar PayPhone no vuelve real a PayPal.
 
 ```bash
 cp backend/.env.ia.example backend/.env.ia
-./levantar.sh
+./levantar.sh --prueba
 ```
 
-También se puede activar solo por una vez con `./levantar.sh --ia`. La primera vez se descarga el modelo `qwen2.5:0.5b`. Por su tamaño reducido, el modelo puede dar respuestas imprecisas.
+También se puede activar solo por una vez con `./levantar.sh --prueba --ia`. La primera vez se descarga el modelo `qwen2.5:0.5b`. Por su tamaño reducido, el modelo puede dar respuestas imprecisas.
 
 ---
 
@@ -243,48 +244,39 @@ El perfil `real` levanta todos los servicios con integraciones reales, incluido 
 | `postgres` | Base de datos | Interno |
 | `redis` | Caché y límites de peticiones | Interno |
 
-**Paso 1. Crear el archivo de configuración**
+Es el modo por defecto del script y no necesita configuración previa:
 
 ```bash
-cp backend/.env.example backend/.env
+./levantar.sh          # Linux, macOS, WSL
+.\levantar.cmd         # Windows (PowerShell o CMD)
 ```
 
-**Paso 2. Completar los valores**
+Qué hace por ti:
 
-Edita `backend/.env` con valores propios. Como mínimo deben tener valor `SECRET_KEY`, `JWT_SECRET_KEY`, `POSTGRES_PASSWORD`, `WHATSAPP_WEBHOOK_TOKEN`, `PB_SUPERUSER_EMAIL` y `PB_SUPERUSER_PASSWORD`. Usa una contraseña hexadecimal para PostgreSQL, que se puede generar así:
+- La primera vez genera los secretos internos (base de datos, firma de tokens, PocketBase y administrador) en `backend/.env.secretos`. Ese archivo no se sube al repositorio y **no debe borrarse** mientras existan los datos, porque la base quedó creada con esa clave.
+- Usa los archivos de integración que existan (`backend/.env.gmail`, `.env.google`, `.env.paypal`, `.env.payphone`, `.env.ia`), igual que el modo prueba.
+- Espera a que la API responda, crea el administrador `admin@masssend.local` y descarga el modelo de IA la primera vez.
+- Al final informa el estado de cada parte:
 
-```bash
-openssl rand -hex 32
-```
+| Parte | Con su archivo | Sin su archivo |
+|-------|----------------|----------------|
+| Correos | Salen por Gmail | Se quedan en Mailpit (`http://localhost:8025`) |
+| Google, PayPal, PayPhone | Activos | "No configurado": esa función responde con error y nunca se simula |
+| Asistente de IA | Modelo de `.env.ia` | Ollama con `qwen2.5:0.5b` |
+| WhatsApp | — | Pide vincularlo con `./levantar.sh --qr` |
 
-**Paso 3. Levantar y crear el administrador**
+La clave del administrador está en `ADMIN_PASSWORD` dentro de `backend/.env.secretos`. `backend/.env` es opcional y solo sirve para ajustes extra, como `ALLOWED_HOSTS` o `FRONTEND_URL`.
 
-```bash
-docker compose --env-file backend/.env --profile real up --build -d
-docker compose --env-file backend/.env --profile real exec backend python manage.py createsuperuser
-```
+| Comando | Qué hace |
+|---------|----------|
+| `./levantar.sh` | Levanta o actualiza producción e informa el estado |
+| `./levantar.sh --estado` | Informa el estado sin levantar nada |
+| `./levantar.sh --qr` | Muestra el código QR para vincular WhatsApp (*Dispositivos vinculados*) |
+| `./levantar.sh --sin paypal` | Deja una integración sin usar aunque exista su archivo |
+| `./levantar.sh --apagar` | Detiene todo y conserva los datos |
+| `./levantar.sh --borrar-datos` | Borra base, archivos y modelos (pide escribir `BORRAR`) |
 
-**Paso 4. Descargar el modelo de IA (una sola vez)**
-
-```bash
-docker compose --env-file backend/.env --profile real exec ollama ollama pull qwen2.5:0.5b
-```
-
-**Paso 5. Vincular WhatsApp**
-
-Revisa el registro del gateway y escanea el código QR desde WhatsApp, en *Dispositivos vinculados*:
-
-```bash
-docker compose --env-file backend/.env --profile real logs -f whatsapp
-```
-
-**Paso 6. Apagar**
-
-```bash
-docker compose --env-file backend/.env --profile real down
-```
-
-Este perfil guarda los datos en volúmenes de Docker, así que se conservan entre arranques. Agregar `-v` al comando anterior los borra.
+El modo prueba y producción usan los mismos puertos. Al levantar producción, el script apaga el modo prueba si estaba arriba; al revés, te pide apagar producción primero.
 
 ---
 
@@ -313,14 +305,17 @@ make check
 | Problema | Solución |
 |----------|----------|
 | `permission denied` al ejecutar `./levantar.sh` | Ejecuta `chmod +x levantar.sh` o usa `bash levantar.sh` |
+| `no se puede cargar ... levantar.ps1` en Windows | Usa `.\levantar.cmd`, que omite la política de ejecución |
+| Una función aparece como "no configurado" | Crea el archivo que indica el informe y vuelve a ejecutar `./levantar.sh` |
+| `Hay datos de produccion pero falta backend/.env.secretos` | Recupera ese archivo; si los datos no importan, `./levantar.sh --borrar-datos` |
 | `bad interpreter` o `\r: command not found` en Windows | El archivo se clonó con saltos de línea de Windows. Ejecuta `git config --global core.autocrlf input`, borra la carpeta y vuelve a clonar |
 | `permission denied` al conectar con Docker en Linux | Agrega tu usuario al grupo `docker` y vuelve a iniciar sesión |
-| `port is already allocated` | Cambia el puerto, por ejemplo `API_PORT=8080 ./levantar.sh`, y actualiza `baseUrl` en Postman |
+| `port is already allocated` | Apaga el otro modo o cambia el puerto: `API_PORT=8080 ./levantar.sh` (Windows: `$env:API_PORT="8080"`), y actualiza `baseUrl` en Postman |
 | El backend no arranca | El script muestra las últimas líneas del registro. Para verlo completo: `docker compose -p masssend-ci logs backend-ci` |
-| Datos de pruebas anteriores interfieren | `./levantar.sh --limpio` |
-| La colección 05 falla en la segunda ejecución | Es esperado, porque el doble factor de la cuenta staff ya se activó. Usa `./levantar.sh --limpio` |
-| Una integración aparece como simulada | `./levantar.sh --estado` indica qué valores faltan en su archivo |
-| El asistente responde con texto simulado | Crea `backend/.env.ia` o ejecuta `./levantar.sh --ia` |
+| Datos de pruebas anteriores interfieren | `./levantar.sh --prueba --limpio` |
+| La colección 05 falla en la segunda ejecución | Es esperado, porque el doble factor de la cuenta staff ya se activó. Usa `./levantar.sh --prueba --limpio` |
+| Una integración aparece como simulada | `./levantar.sh --prueba --estado` indica qué valores faltan en su archivo |
+| El asistente responde con texto simulado | Crea `backend/.env.ia` o ejecuta `./levantar.sh --prueba --ia` |
 
 ---
 
@@ -344,7 +339,8 @@ postman/
 ├── environments/         entorno local
 └── archivos/             archivos de muestra
 compose.yaml              orquestación con los perfiles real, ci e ia
-levantar.sh               arranque en un solo paso
+levantar.sh               arranque en un solo paso (producción o --prueba)
+levantar.cmd, .ps1        equivalente para Windows
 ```
 
 Los módulos de negocio son `identidad`, `creditos`, `ia`, `campanas` y `envio`, más `shared` para lo común. Cada uno existe dentro de cada anillo, y el núcleo (`domain` y `application`) solo usa la biblioteca estándar de Python.

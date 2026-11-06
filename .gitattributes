@@ -1,0 +1,5 @@
+# Finales de linea fijos para que los scripts funcionen al clonar en Windows o Linux.
+*.sh   text eol=lf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
