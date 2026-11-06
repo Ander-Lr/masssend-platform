@@ -1,9 +1,10 @@
+import { cx } from './clases'
 // Tabla con el estilo del base: cabecera gris y filas separadas por una linea suave.
 export function Tabla({ children, className = '', atenuada = false }) {
   return (
-    <table className={`w-full border-collapse text-[0.83rem] [&_td]:border-b [&_td]:border-gray-100 [&_td]:px-4 [&_td]:py-2.5
+    <table className={cx(`w-full border-collapse text-[0.83rem] [&_td]:border-b [&_td]:border-gray-100 [&_td]:px-4 [&_td]:py-2.5
       [&_th]:bg-gray-50 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-[0.78rem] [&_th]:font-semibold [&_th]:text-gray-500
-      ${atenuada ? 'opacity-60' : ''} ${className}`}>
+      ${atenuada ? 'opacity-60' : ''}`, className)}>
       {children}
     </table>
   )
@@ -11,7 +12,7 @@ export function Tabla({ children, className = '', atenuada = false }) {
 
 export function ContenedorTabla({ titulo, children, className = '' }) {
   return (
-    <div className={`overflow-x-auto rounded-xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] ${className}`}>
+    <div className={cx(`overflow-x-auto rounded-xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]`, className)}>
       {titulo && <h2 className="border-b border-gray-200 px-5 py-4 text-base font-bold">{titulo}</h2>}
       {children}
     </div>

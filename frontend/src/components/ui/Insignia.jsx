@@ -1,3 +1,4 @@
+import { cx } from './clases'
 const COLORES = {
   verde: 'bg-emerald-100 text-emerald-800',
   gris: 'bg-gray-100 text-gray-500',
@@ -9,7 +10,7 @@ const COLORES = {
 
 export default function Insignia({ color = 'gris', grande = false, className = '', children }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full font-bold ${grande ? 'px-4 py-1.5 text-[0.82rem]' : 'px-2.5 py-0.5 text-[0.72rem]'} ${COLORES[color]} ${className}`}>
+    <span className={cx(`inline-flex items-center gap-1.5 rounded-full font-bold ${grande ? 'px-4 py-1.5 text-[0.82rem]' : 'px-2.5 py-0.5 text-[0.72rem]'} ${COLORES[color]}`, className)}>
       {children}
     </span>
   )

@@ -79,7 +79,7 @@ function Resultado({ resultado, onOtro }) {
       )}
       <div className="mt-3.5 flex gap-2.5">
         <Boton variante="oscuro" className="px-5 py-2" onClick={onOtro}>Importar otro archivo</Boton>
-        <Link to="/contactos" className={`${claseBoton({ variante: 'secundario' })} px-5 py-2`}>Ver contactos</Link>
+        <Link to="/contactos" className={claseBoton({ variante: 'secundario', extra: 'px-5 py-2' })}>Ver contactos</Link>
       </div>
     </div>
   )

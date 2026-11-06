@@ -1,9 +1,10 @@
+import { cx } from './clases'
 const COLORES = {
   verde: 'text-emerald-500', azul: 'text-blue-500', rojo: 'text-red-500', morado: 'text-violet-500', normal: 'text-tinta',
 }
 
 export function Estadisticas({ children, className = '' }) {
-  return <div className={`mb-7 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 ${className}`}>{children}</div>
+  return <div className={cx(`mb-7 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4`, className)}>{children}</div>
 }
 
 export default function Estadistica({ valor, etiqueta, color = 'normal', onClick }) {

@@ -1,4 +1,9 @@
 // Clases de botones reutilizables en enlaces y botones.
+import { twMerge } from 'tailwind-merge'
+
+// Une clases y, si dos chocan (por ejemplo py-2 y py-2.5), gana la ultima.
+export const cx = (...clases) => twMerge(clases.filter(Boolean).join(' '))
+
 const VARIANTES = {
   primario: 'bg-marca text-white hover:bg-marca-oscuro',
   secundario: 'bg-gray-100 text-gray-700 border border-gray-200 font-semibold hover:bg-gray-200',
@@ -15,10 +20,12 @@ const TAMANOS = {
   lg: 'px-[22px] py-3 text-[0.9rem]',
 }
 
-export const claseBoton = ({ variante = 'primario', tamano = 'md', bloque = false } = {}) =>
+export const claseBoton = ({ variante = 'primario', tamano = 'md', bloque = false, extra = '' } = {}) => cx(
   `inline-flex items-center justify-center gap-1.5 rounded-lg font-bold transition-colors no-underline
    disabled:bg-gray-400 disabled:border-gray-400 disabled:text-white
-   ${VARIANTES[variante]} ${TAMANOS[tamano]} ${bloque ? 'w-full' : ''}`
+   ${VARIANTES[variante]} ${TAMANOS[tamano]} ${bloque ? 'w-full' : ''}`,
+  extra,
+)
 
 
 export const claseEnlace = 'text-[0.82rem] font-semibold text-marca-enlace underline'

@@ -1,3 +1,4 @@
+import { cx } from './clases'
 // Entradas de formulario con el borde verde al enfocar, como en el base.
 export const claseEntrada =
   'w-full rounded-lg border-[1.5px] border-gray-200 bg-white px-3.5 py-2.5 text-[0.9rem] outline-none transition-colors focus:border-marca disabled:bg-gray-50'
@@ -6,7 +7,7 @@ export const claseFiltro =
 export const claseCasilla = 'size-[15px] cursor-pointer accent-indigo-500'
 
 export function Etiqueta({ children, className = '' }) {
-  return <label className={`mb-1.5 block text-[0.82rem] font-semibold text-gray-700 ${className}`}>{children}</label>
+  return <label className={cx(`mb-1.5 block text-[0.82rem] font-semibold text-gray-700`, className)}>{children}</label>
 }
 
 export function Ayuda({ children, color = 'text-gray-500' }) {

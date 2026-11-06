@@ -225,7 +225,7 @@ export default function ContactosPage() {
     <Pagina
       titulo="Contactos"
       acciones={<>
-        <Link to="/importar" className={`${claseBoton({ variante: 'indigo' })} px-[18px] py-2 text-[0.85rem] font-semibold`}>Importar CSV</Link>
+        <Link to="/importar" className={claseBoton({ variante: 'indigo', extra: 'px-[18px] py-2 text-[0.85rem] font-semibold' })}>Importar CSV</Link>
         <Boton className="px-[18px] py-2 text-[0.85rem]" onClick={() => setFormulario('nuevo')}>+ Agregar contacto</Boton>
       </>}
     >

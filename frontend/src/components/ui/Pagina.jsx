@@ -1,7 +1,8 @@
+import { cx } from './clases'
 // Contenedor de cada seccion con su titulo y acciones.
 export default function Pagina({ titulo, subtitulo, acciones, fondo = 'bg-panel', className = '', children }) {
   return (
-    <div className={`flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 ${fondo} ${className}`}>
+    <div className={cx(`flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 ${fondo}`, className)}>
       {(titulo || acciones) && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
