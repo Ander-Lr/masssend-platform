@@ -6,6 +6,7 @@ import AlertBox from '../../components/auth/AlertBox'
 import PrimaryButton from '../../components/auth/PrimaryButton'
 import LinkButton from '../../components/auth/LinkButton'
 import { useAuth } from '../../context/AuthContext'
+import { tomarDestino } from './pasos'
 
 // Segundo paso del inicio de sesion para cuentas que ya tienen el doble factor.
 export default function TotpPage() {
@@ -23,7 +24,7 @@ export default function TotpPage() {
     setCargando(true)
     try {
       await validarTotp(codigo)
-      navigate('/', { replace: true })
+      navigate(tomarDestino(), { replace: true })
     } catch (err) {
       setError(err.estado === 401
         ? 'El código no es válido o la verificación venció. Si pasaron más de 5 minutos, vuelve a iniciar sesión.'

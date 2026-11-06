@@ -9,7 +9,7 @@ export default function GoogleButton({ onError }) {
     setCargando(true)
     try {
       const { url } = await urlGoogle()
-      window.location.href = url
+      window.location.assign(url)
     } catch (e) {
       onError?.(e.mensajeUsuario || 'No se pudo iniciar el acceso con Google.')
       setCargando(false)

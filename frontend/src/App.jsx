@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sileo'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
@@ -12,16 +12,23 @@ import EnrolarMfaPage from './pages/auth/EnrolarMfaPage'
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage'
 import InicioPage from './pages/InicioPage'
 import SeguridadPage from './pages/SeguridadPage'
+import CreditosPage from './pages/CreditosPage'
+import RetornoPagoPage from './pages/RetornoPagoPage'
+import AsistentePage from './pages/AsistentePage'
+import { recordarDestino } from './pages/auth/pasos'
 
 function Cargando() {
   return <div className="loading" style={{ height: '100vh' }}>Cargando...</div>
 }
 
-// Solo con sesion. Sin ella, vuelve al login.
+// Solo con sesion. Sin ella, recuerda la pagina pedida y va al login.
 function Privada({ children }) {
   const { usuario, cargando } = useAuth()
+  const { pathname, search } = useLocation()
   if (cargando) return <Cargando />
-  return usuario ? children : <Navigate to="/login" replace />
+  if (usuario) return children
+  if (pathname !== '/') recordarDestino(pathname + search)
+  return <Navigate to="/login" replace />
 }
 
 // Solo sin sesion. Con ella, va al inicio.
@@ -50,9 +57,13 @@ function Rutas() {
       <Route path="/auth/google/callback" element={<Publica><GoogleCallbackPage /></Publica>} />
       {/* El enlace del correo de recuperacion se abre con o sin sesion. */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* PayPal y PayPhone vuelven aqui despues del pago. */}
+      <Route path="/billing/return" element={<Privada><RetornoPagoPage /></Privada>} />
 
       <Route element={<Privada><Layout /></Privada>}>
         <Route index element={<InicioPage />} />
+        <Route path="creditos" element={<CreditosPage />} />
+        <Route path="asistente" element={<AsistentePage />} />
         <Route path="seguridad" element={<SeguridadPage />} />
       </Route>
 

@@ -266,3 +266,18 @@ td { padding: 10px 16px; font-size: 0.83rem; border-bottom: 1px solid #f0f2f5; }
 .acceso:hover { transform: translateY(-4px); box-shadow: 0 8px 24px color-mix(in srgb, var(--color) 15%, transparent); }
 .acceso h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
 .acceso p { font-size: 0.82rem; color: #666; line-height: 1.5; }
+
+/* ── Creditos ── */
+.paquete { border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.paquete + .paquete { margin-top: 12px; }
+.stats-grid .stat-card { border: 1px solid #e5e7eb; box-shadow: none; }
+
+/* ── Asistente ── */
+.insignia-amarilla { background: #fef3c7; color: #b45309; }
+.sugerencia { padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e5e7eb; background: #f9fafb; color: #374151; font-size: 0.83rem; cursor: pointer; font-family: inherit; }
+.sugerencia:hover { border-color: #25d366; }
+.burbuja-ia { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; white-space: pre-wrap; line-height: 1.5; background: #f3f4f6; color: #1f2937; display: inline-block; }
+.burbuja-ia.usuario { background: #25d366; color: #fff; }
+.burbuja-ia.error { background: #fee2e2; color: #b91c1c; }
+.burbuja-pie { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: #6b7280; flex-wrap: wrap; }
+.burbuja-pie button { border: none; background: transparent; color: #2563eb; cursor: pointer; font-size: 0.72rem; font-weight: 700; padding: 0; font-family: inherit; }

@@ -3,6 +3,14 @@
 export const MODULOS = [
   { id: 'inicio', ruta: '/', label: 'Inicio' },
   {
+    id: 'creditos', ruta: '/creditos', label: 'Créditos',
+    titulo: 'Créditos', desc: 'Consulta tu saldo y compra paquetes con PayPal o PayPhone.', color: '#f59e0b',
+  },
+  {
+    id: 'asistente', ruta: '/asistente', label: 'Asistente IA',
+    titulo: 'Asistente IA', desc: 'Resuelve dudas y redacta mensajes para tus campañas.', color: '#8b5cf6',
+  },
+  {
     id: 'seguridad', ruta: '/seguridad', label: 'Seguridad',
     titulo: 'Seguridad de la cuenta', desc: 'Doble factor y cambio de contraseña.', color: '#0ea5e9',
   },

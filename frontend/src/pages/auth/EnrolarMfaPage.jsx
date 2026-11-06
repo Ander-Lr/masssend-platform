@@ -3,6 +3,7 @@ import AuthCard from '../../components/auth/AuthCard'
 import MfaEnrolamiento from '../../components/auth/MfaEnrolamiento'
 import LinkButton from '../../components/auth/LinkButton'
 import { useAuth } from '../../context/AuthContext'
+import { tomarDestino } from './pasos'
 
 // El doble factor es obligatorio: quien no lo tiene lo activa antes de entrar.
 export default function EnrolarMfaPage() {
@@ -13,7 +14,7 @@ export default function EnrolarMfaPage() {
 
   const alActivar = async par => {
     await completarSesion(par)
-    navigate('/', { replace: true })
+    navigate(tomarDestino(), { replace: true })
   }
 
   return (
