@@ -3,6 +3,10 @@
 export const MODULOS = [
   { id: 'inicio', ruta: '/', label: 'Inicio' },
   {
+    id: 'campanas', ruta: '/campanas', label: 'Campañas',
+    titulo: 'Campañas', desc: 'Crea mensajes personalizados y envíalos a tus contactos.', color: '#25d366',
+  },
+  {
     id: 'contactos', ruta: '/contactos', label: 'Contactos',
     titulo: 'Contactos', desc: 'Gestiona tu lista de clientes, etiquetas y bajas.', color: '#10b981',
   },

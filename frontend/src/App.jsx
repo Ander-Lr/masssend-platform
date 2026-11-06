@@ -14,6 +14,7 @@ import InicioPage from './pages/InicioPage'
 import SeguridadPage from './pages/SeguridadPage'
 import CreditosPage from './pages/CreditosPage'
 import ContactosPage from './pages/ContactosPage'
+import CampanasPage from './pages/CampanasPage'
 import ImportarContactosPage from './pages/ImportarContactosPage'
 import RetornoPagoPage from './pages/RetornoPagoPage'
 import AsistentePage from './pages/AsistentePage'
@@ -64,6 +65,7 @@ function Rutas() {
 
       <Route element={<Privada><Layout /></Privada>}>
         <Route index element={<InicioPage />} />
+        <Route path="campanas" element={<CampanasPage />} />
         <Route path="contactos" element={<ContactosPage />} />
         <Route path="importar" element={<ImportarContactosPage />} />
         <Route path="creditos" element={<CreditosPage />} />
