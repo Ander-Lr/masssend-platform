@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { modulosVisibles } from '../../modulos'
 import { ICONOS } from './iconos'
+import { useWhatsapp } from '../../context/WhatsappContext'
 
 const CLAVE_CONTRAIDO = 'masssend.menuContraido'
 
@@ -20,6 +21,17 @@ function Chevron({ contraido }) {
       <polyline points={contraido ? '9 18 15 12 9 6' : '15 18 9 12 15 6'} />
     </svg>
   )
+}
+
+// Estado del numero de la plataforma, como en el base. Solo lo ve staff.
+function EstadoWhatsapp({ contraido }) {
+  const { conectado } = useWhatsapp()
+  if (conectado === null) return null
+  const clase = conectado ? 'on' : 'off'
+  if (contraido) {
+    return <div className={`estado-wa-menu ${clase}`} style={{ justifyContent: 'center', background: 'none', border: 'none', margin: '0 0 4px' }} title={conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado'}><i /></div>
+  }
+  return <div className={`estado-wa-menu ${clase}`}><i />{conectado ? 'WA Conectado' : 'WA Desconectado'}</div>
 }
 
 export default function Layout() {
@@ -62,6 +74,8 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        <EstadoWhatsapp contraido={contraido} />
 
         <div className="menu-pie" style={{ alignItems: contraido ? 'center' : 'stretch', padding: contraido ? '12px 0' : '12px 16px' }}>
           {!contraido && (

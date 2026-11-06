@@ -15,6 +15,22 @@ export const MODULOS = [
     titulo: 'Importar CSV', desc: 'Carga cientos de contactos desde un archivo.', color: '#7c3aed',
   },
   {
+    id: 'mensajes', ruta: '/mensajes', label: 'Mensajes',
+    titulo: 'Mensajes', desc: 'Historial de lo enviado y las respuestas de tus contactos.', color: '#3b82f6',
+  },
+  {
+    id: 'reportes', ruta: '/reportes', label: 'Reportes',
+    titulo: 'Reportes', desc: 'Entregas, lecturas y actividad de tus campañas.', color: '#6366f1',
+  },
+  {
+    id: 'chat', ruta: '/chat', label: 'Chat', soloStaff: true,
+    titulo: 'Chat', desc: 'Conversa con los contactos desde el número de la plataforma.', color: '#128c4a',
+  },
+  {
+    id: 'whatsapp', ruta: '/whatsapp', label: 'Conectar WhatsApp', soloStaff: true,
+    titulo: 'Conectar WhatsApp', desc: 'Vincula el número desde el que se envían las campañas.', color: '#25d366',
+  },
+  {
     id: 'creditos', ruta: '/creditos', label: 'Créditos',
     titulo: 'Créditos', desc: 'Consulta tu saldo y compra paquetes con PayPal o PayPhone.', color: '#f59e0b',
   },

@@ -345,3 +345,37 @@ td { padding: 10px 16px; font-size: 0.83rem; border-bottom: 1px solid #f0f2f5; }
 .adjunto-nuevo { background: rgba(0,0,0,0.06); border-radius: 6px; padding: 8px 10px; font-size: 0.78rem; margin-bottom: 6px; color: #374151; }
 .stat-card.red .stat-num { color: #ef4444; }
 @media (max-width: 760px) { .formulario-campana { grid-template-columns: 1fr; } }
+
+/* ── WhatsApp, mensajes, chat y reportes ── */
+.titulo-seccion { font-size: 0.72rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+.paso { display: flex; gap: 10px; margin-bottom: 8px; font-size: 0.82rem; color: #555; }
+.paso span { min-width: 22px; height: 22px; border-radius: 50%; background: #7c3aed; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; }
+.paso p { padding-top: 2px; line-height: 1.5; }
+.codigo-vinculacion { display: inline-flex; align-items: center; gap: 8px; font-family: monospace; font-size: 1.8rem; font-weight: 700; letter-spacing: 0.15em; color: #1a1a2e; background: #faf5ff; border: 1.5px dashed #c4b5fd; border-radius: 10px; padding: 12px 20px; }
+.codigo-vinculacion .guion { color: #c4b5fd; }
+.circulo-ok { width: 56px; height: 56px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+.estado-wa-menu { display: flex; align-items: center; gap: 7px; padding: 8px 12px; margin: 0 12px 4px; border-radius: 8px; font-size: 0.72rem; font-weight: 600; }
+.estado-wa-menu.on { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #059669; }
+.estado-wa-menu.off { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #dc2626; }
+.estado-wa-menu i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.estado-wa-menu.on i { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.estado-wa-menu.off i { background: #ef4444; animation: pulse 2s infinite; }
+.direccion { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+.direccion.saliente { background: #eef2ff; color: #4338ca; }
+.direccion.entrante { background: #ecfdf5; color: #047857; }
+.texto-recortado { color: #374151; }
+.pill-read { background: #d1fae5; color: #065f46; }
+.avatar-texto { background: #dcf8c6; color: #075e54; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+.aviso-chat { align-self: center; background: #fff8c4; color: #6b5e00; font-size: 0.78rem; padding: 8px 14px; border-radius: 8px; margin: 8px 0; text-align: center; max-width: 420px; }
+.send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+.grafica { display: flex; align-items: flex-end; gap: 4px; height: 170px; overflow-x: auto; }
+.grafica-dia { flex: 1; min-width: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.grafica-barras { width: 100%; height: 140px; display: flex; gap: 2px; align-items: flex-end; }
+.grafica-barras div { flex: 1; border-radius: 3px 3px 0 0; transition: height 0.3s; }
+.grafica-dia span { font-size: 0.62rem; color: #aaa; white-space: nowrap; height: 14px; }
+.grafica-vacia { display: flex; align-items: center; justify-content: center; height: 170px; color: #ccc; font-size: 0.85rem; }
+.leyenda { display: flex; gap: 16px; font-size: 0.75rem; color: #6b7280; margin-top: 10px; }
+.leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.fila-resumen { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 0.85rem; }
+.fila-resumen:last-child { border-bottom: none; }
+@media (max-width: 720px) { .chat-list { width: 100%; } .chat-page { flex-direction: column; } }

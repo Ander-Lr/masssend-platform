@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sileo'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { WhatsappProvider } from './context/WhatsappContext'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
@@ -15,6 +16,10 @@ import SeguridadPage from './pages/SeguridadPage'
 import CreditosPage from './pages/CreditosPage'
 import ContactosPage from './pages/ContactosPage'
 import CampanasPage from './pages/CampanasPage'
+import MensajesPage from './pages/MensajesPage'
+import ReportesPage from './pages/ReportesPage'
+import ChatPage from './pages/ChatPage'
+import WhatsAppPage from './pages/WhatsAppPage'
 import ImportarContactosPage from './pages/ImportarContactosPage'
 import RetornoPagoPage from './pages/RetornoPagoPage'
 import AsistentePage from './pages/AsistentePage'
@@ -42,7 +47,6 @@ function Publica({ children }) {
 }
 
 // Solo para cuentas staff; el backend igual responde 403 a las demas.
-// eslint-disable-next-line no-unused-vars
 function SoloStaff({ children }) {
   const { usuario } = useAuth()
   return usuario?.es_staff ? children : <Navigate to="/" replace />
@@ -63,11 +67,15 @@ function Rutas() {
       {/* PayPal y PayPhone vuelven aqui despues del pago. */}
       <Route path="/billing/return" element={<Privada><RetornoPagoPage /></Privada>} />
 
-      <Route element={<Privada><Layout /></Privada>}>
+      <Route element={<Privada><WhatsappProvider><Layout /></WhatsappProvider></Privada>}>
         <Route index element={<InicioPage />} />
         <Route path="campanas" element={<CampanasPage />} />
         <Route path="contactos" element={<ContactosPage />} />
         <Route path="importar" element={<ImportarContactosPage />} />
+        <Route path="mensajes" element={<MensajesPage />} />
+        <Route path="reportes" element={<ReportesPage />} />
+        <Route path="chat" element={<SoloStaff><ChatPage /></SoloStaff>} />
+        <Route path="whatsapp" element={<SoloStaff><WhatsAppPage /></SoloStaff>} />
         <Route path="creditos" element={<CreditosPage />} />
         <Route path="asistente" element={<AsistentePage />} />
         <Route path="seguridad" element={<SeguridadPage />} />
