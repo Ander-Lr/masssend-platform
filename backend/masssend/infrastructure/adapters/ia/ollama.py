@@ -23,7 +23,7 @@ class GeneradorOllama:
                     "messages": [{"role": m.rol, "content": m.contenido} for m in mensajes],
                     "stream": False,
                     # repeat_penalty evita que un modelo pequeno entre en bucle.
-                    "options": {"temperature": 0.3, "num_predict": 220, "repeat_penalty": 1.15},
+                    "options": {"temperature": 0.2, "num_predict": 400, "repeat_penalty": 1.15},
                 },
                 timeout=self._tiempo_maximo,
             )
@@ -33,7 +33,9 @@ class GeneradorOllama:
         except (requests.RequestException, ValueError, KeyError, TypeError) as error:
             logger.warning("Ollama no respondio: %s", type(error).__name__)
             raise ServicioNoDisponible("El asistente no está disponible.") from error
-        return TextoGenerado(texto, str(datos.get("model", self._modelo)))
+        # Ollama marca done_reason=length cuando corta por llegar a num_predict.
+        completo = datos.get("done_reason") != "length"
+        return TextoGenerado(texto, str(datos.get("model", self._modelo)), completo)
 
     def estado(self) -> EstadoGenerador:
         try:

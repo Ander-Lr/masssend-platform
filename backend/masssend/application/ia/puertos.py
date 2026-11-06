@@ -14,6 +14,8 @@ class MensajeChat:
 class TextoGenerado:
     texto: str
     modelo: str
+    # False si el modelo se quedo sin espacio y corto la respuesta a mitad.
+    completo: bool = True
 
 
 @dataclass(frozen=True, slots=True)

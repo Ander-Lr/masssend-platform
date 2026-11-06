@@ -103,7 +103,7 @@ export default function AsistentePage() {
               {m.contenido}
               {m.rol === 'assistant' && !m.error && (
                 <div className="mt-2 flex flex-wrap items-center gap-2.5 text-[0.72rem] text-gray-500">
-                  <span>{m.modelo} · {m.latencia} ms</span>
+                  <span>{m.latencia ? `${m.modelo} · ${m.latencia} ms` : m.modelo}</span>
                   <button onClick={() => copiar(m.contenido, idx)} className="p-0 font-bold text-blue-600">
                     {copiado === idx ? 'Copiado' : 'Copiar para tu campaña'}
                   </button>

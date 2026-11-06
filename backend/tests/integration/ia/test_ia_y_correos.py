@@ -118,6 +118,20 @@ def test_ollama_envia_los_mensajes_por_chat_y_lee_la_respuesta() -> None:
     assert cuerpo["stream"] is False
     assert cuerpo["options"]["repeat_penalty"] > 1
     assert llamada.call_args.kwargs["timeout"] == 5
+    assert generado.completo is True
+
+
+def test_ollama_avisa_cuando_corta_la_respuesta_por_largo() -> None:
+    simulada = MagicMock()
+    simulada.json.return_value = {
+        "message": {"role": "assistant", "content": "1. Paso.\n2. Aseg"},
+        "model": "m",
+        "done_reason": "length",
+    }
+    ruta = "masssend.infrastructure.adapters.ia.ollama.requests.post"
+    with patch(ruta, return_value=simulada):
+        generado = GeneradorOllama("http://ollama/", "m", 5).generar([MensajeChat("user", "x")])
+    assert generado.completo is False
 
 
 @pytest.mark.parametrize(
