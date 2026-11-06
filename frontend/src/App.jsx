@@ -20,8 +20,11 @@ import MensajesPage from './pages/MensajesPage'
 import ReportesPage from './pages/ReportesPage'
 import ChatPage from './pages/ChatPage'
 import WhatsAppPage from './pages/WhatsAppPage'
+import NotificacionesPage from './pages/NotificacionesPage'
+import ColaCorreosPage from './pages/ColaCorreosPage'
 import ImportarContactosPage from './pages/ImportarContactosPage'
 import RetornoPagoPage from './pages/RetornoPagoPage'
+import PagoLocalPage from './pages/PagoLocalPage'
 import AsistentePage from './pages/AsistentePage'
 import { recordarDestino } from './pages/auth/pasos'
 
@@ -53,6 +56,11 @@ function SoloStaff({ children }) {
 }
 
 function Rutas() {
+  // Postman abre /?pagar=<url_pago> para entrar a PayPhone desde el dominio registrado.
+  const { pathname, search } = useLocation()
+  const pagar = pathname === '/' ? new URLSearchParams(search).get('pagar') : null
+  if (pagar !== null) return <PagoLocalPage url={pagar} />
+
   return (
     <Routes>
       <Route path="/login" element={<Publica><LoginPage /></Publica>} />
@@ -65,7 +73,7 @@ function Rutas() {
       {/* El enlace del correo de recuperacion se abre con o sin sesion. */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* PayPal y PayPhone vuelven aqui despues del pago. */}
-      <Route path="/billing/return" element={<Privada><RetornoPagoPage /></Privada>} />
+      <Route path="/billing/return" element={<RetornoPagoPage />} />
 
       <Route element={<Privada><WhatsappProvider><Layout /></WhatsappProvider></Privada>}>
         <Route index element={<InicioPage />} />
@@ -76,6 +84,8 @@ function Rutas() {
         <Route path="reportes" element={<ReportesPage />} />
         <Route path="chat" element={<SoloStaff><ChatPage /></SoloStaff>} />
         <Route path="whatsapp" element={<SoloStaff><WhatsAppPage /></SoloStaff>} />
+        <Route path="notificaciones" element={<SoloStaff><NotificacionesPage /></SoloStaff>} />
+        <Route path="cola-correos" element={<SoloStaff><ColaCorreosPage /></SoloStaff>} />
         <Route path="creditos" element={<CreditosPage />} />
         <Route path="asistente" element={<AsistentePage />} />
         <Route path="seguridad" element={<SeguridadPage />} />

@@ -2,6 +2,10 @@
 
 Interfaz web de MassSend en React, Vite y Tailwind CSS. Consume solo la API v1 del backend (`/api/v1/`).
 
+## En Docker
+
+`./levantar.sh` (o `./levantar.sh --prueba`) construye esta carpeta y la sirve con Nginx en `http://localhost:5173`. Nginx reenvía `/api` al backend dentro de la red de Docker, según la variable `API_DESTINO` (ver `docker/nginx.conf.template`).
+
 ## Desarrollo
 
 Requiere Node.js 20 o superior y el backend levantado en `http://localhost:8000`.

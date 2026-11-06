@@ -31,6 +31,14 @@ export const MODULOS = [
     titulo: 'Conectar WhatsApp', desc: 'Vincula el número desde el que se envían las campañas.', color: '#25d366',
   },
   {
+    id: 'notificaciones', ruta: '/notificaciones', label: 'Notificaciones', soloStaff: true,
+    titulo: 'Notificaciones', desc: 'Envía correos con la plantilla de MassSend.', color: '#0ea5e9',
+  },
+  {
+    id: 'cola', ruta: '/cola-correos', label: 'Cola de correos', soloStaff: true,
+    titulo: 'Cola de correos', desc: 'Revisa, pausa o reanuda los correos pendientes.', color: '#f97316',
+  },
+  {
     id: 'creditos', ruta: '/creditos', label: 'Créditos',
     titulo: 'Créditos', desc: 'Consulta tu saldo y compra paquetes con PayPal o PayPhone.', color: '#f59e0b',
   },

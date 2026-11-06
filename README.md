@@ -2,7 +2,7 @@
 
 Plataforma para que los negocios lleguen a sus clientes por WhatsApp: gestiona contactos, lanza campañas personalizadas y mide resultados, con créditos prepagados y pagos en línea.
 
-Este repositorio contiene el backend, construido con arquitectura Onion y diseño guiado por el dominio (DDD). El frontend se incorporará en una fase posterior.
+Este repositorio contiene el backend, construido con arquitectura Onion y diseño guiado por el dominio (DDD), y el frontend web en React con Tailwind CSS, que consume solo la API v1.
 
 Desarrollado como proyecto de la asignatura **Arquitectura del Software**
 
@@ -18,7 +18,7 @@ Sede Santo Domingo de los Tsáchilas
 
 1. [Prerrequisitos](#1-prerrequisitos)
 2. [Inicio rápido](#2-inicio-rápido)
-3. [Probar la API con Postman](#3-probar-la-api-con-postman)
+3. [Usar la aplicación web y probar la API con Postman](#3-usar-la-aplicación-web-y-probar-la-api-con-postman)
 4. [Integraciones reales opcionales](#4-integraciones-reales-opcionales)
 5. [Sistema completo con WhatsApp](#5-sistema-completo-con-whatsapp)
 6. [Pruebas automatizadas](#6-pruebas-automatizadas)
@@ -49,7 +49,7 @@ Puertos que deben estar libres en el equipo:
 |--------|----------|
 | 8000 | API (`http://localhost:8000/api/v1/`) |
 | 8025 | Mailpit, bandeja de correos de prueba |
-| 5173 | Página local de pagos |
+| 5173 | Aplicación web (frontend) |
 
 Si alguno está ocupado, se puede cambiar con las variables `API_PORT`, `MAILPIT_PORT` y `FRONTEND_PORT` (ver la sección 7).
 
@@ -95,7 +95,7 @@ chmod +x levantar.sh
 
 Sin `--prueba` el script levanta el sistema en producción (sección 5).
 
-La primera vez tarda varios minutos porque descarga las imágenes y construye el backend. Al terminar, el script muestra las direcciones de la API, de Mailpit y de la página de pagos, junto con la cuenta staff de prueba.
+La primera vez tarda varios minutos porque descarga las imágenes y construye el backend y el frontend. Al terminar, el script muestra las direcciones de la aplicación web, de la API y de Mailpit, junto con la cuenta staff de prueba.
 
 **Paso 4. Comprobar que la API responde**
 
@@ -105,7 +105,7 @@ Abre en el navegador `http://localhost:8000/api/v1/salud` o ejecuta:
 curl http://localhost:8000/api/v1/salud
 ```
 
-La respuesta debe indicar que la base de datos y la caché están operativas.
+La respuesta debe indicar que la base de datos y la caché están operativas. Después abre la aplicación web en `http://localhost:5173`.
 
 **Paso 5. Apagar**
 
@@ -141,7 +141,27 @@ docker compose -p masssend-ci --env-file backend/tests/ci.env --profile ci down 
 
 ---
 
-## 3. Probar la API con Postman
+## 3. Usar la aplicación web y probar la API con Postman
+
+### Aplicación web
+
+Abre `http://localhost:5173`. Crea una cuenta, verifica el correo con el código que llega a Mailpit (`http://localhost:8025`) y activa el doble factor con Google Authenticator: es obligatorio para todas las cuentas. En modo prueba también puedes entrar con la cuenta staff `staff@prueba.local` y la clave `clave-larga-123`.
+
+| Módulo | Quién lo ve | Qué hace |
+|--------|-------------|----------|
+| Inicio | Todos | Resumen de créditos y campañas, y accesos a cada módulo |
+| Campañas | Todos | Crear, adjuntar imagen o video, lanzar, cancelar y ver el progreso en vivo |
+| Contactos e Importar CSV | Todos | Contactos con etiquetas y bajas, e importación con vista previa |
+| Mensajes y Reportes | Todos | Historial de mensajes y estadísticas de entrega y lectura |
+| Créditos | Todos | Saldo, movimientos y compra con PayPal o PayPhone |
+| Asistente IA | Todos | Dudas y redacción de mensajes con Ollama |
+| Seguridad | Todos | Doble factor y cambio de contraseña |
+| Chat, Conectar WhatsApp | Staff | Conversaciones y vinculación del número de la plataforma |
+| Notificaciones, Cola de correos | Staff | Envío de correos y control de la cola |
+
+Para trabajar en el frontend sin Docker, consulta `frontend/README.md`.
+
+### Postman
 
 1. Abre Postman e importa el entorno `postman/environments/local.postman_environment.json`.
 2. Importa las cinco colecciones de `postman/collections/`.
@@ -196,16 +216,17 @@ El script indica al final qué variables hay que cambiar en el entorno de Postma
 ### Acceso con Google
 
 1. En Google Cloud crea un ID de cliente OAuth de tipo *Aplicación web*.
-2. Agrega la URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback`.
+2. Agrega las URI de redireccionamiento `http://localhost:8000/api/v1/auth/google/callback` (para Postman) y `http://localhost:5173/auth/google/callback` (para la aplicación web).
 3. Pega el ID y el secreto en `backend/.env.google`.
-4. En Postman cambia `modoGoogle` a `google`. La petición **Iniciar Google** devuelve una URL que se abre en el navegador antes de 10 minutos. El navegador muestra un `token_desafio` con el que se continúa el doble factor en Postman. La petición **Completar Google** se omite en este modo.
+4. Para entrar con Google desde la aplicación web, escribe `GOOGLE_RETORNO_V1=http://localhost:5173/auth/google/callback` en `backend/.env.google`. Para Postman deja ese valor vacío.
+5. En Postman cambia `modoGoogle` a `google`. La petición **Iniciar Google** devuelve una URL que se abre en el navegador antes de 10 minutos. El navegador muestra un `token_desafio` con el que se continúa el doble factor en Postman. La petición **Completar Google** se omite en este modo.
 
 ### PayPal Sandbox
 
 1. En `https://developer.paypal.com` crea una app en modo Sandbox.
 2. Pega el Client ID y el Secret en `backend/.env.paypal`.
 3. En Postman cambia `modoPago` a `paypal`. La petición **Checkout** devuelve la URL de PayPal. Ábrela, paga con la cuenta *Personal* de Sandbox y luego ejecuta **Confirmar**.
-4. Al terminar, PayPal redirige a `localhost:5173`. Mientras no exista el frontend esa página puede no cargar, y eso no afecta al pago.
+4. Al terminar, PayPal vuelve a `http://localhost:5173/billing/return`. Si la compra se hizo desde la aplicación web, esa página la confirma sola y acredita los créditos. Si se hizo desde Postman, muestra la orden y se ejecuta **Confirmar**.
 
 Las peticiones **Pago rechazado** y **Cobro por otro monto** se omiten en este modo, porque PayPal no acepta respuestas simuladas.
 
@@ -214,7 +235,7 @@ Las peticiones **Pago rechazado** y **Cobro por otro monto** se omiten en este m
 1. En Payphone Developer crea una aplicación **WEB** en ambiente **PRUEBAS** con la URL de respuesta `http://localhost:5173/billing/return?provider=payphone`.
 2. Pega el token y el StoreID de la pestaña *Credenciales* en `backend/.env.payphone`.
 3. En Postman cambia `modoPayphone` a `payphone` y usa la carpeta **PayPhone** de la colección 02.
-4. **Checkout PayPhone** guarda en `urlPagoLocal` la dirección que debes abrir. Después de pagar, la página muestra el `id`. Cópialo en `payphoneId` y ejecuta **Confirmar PayPhone** antes de 5 minutos, porque si no se confirma a tiempo PayPhone revierte el cobro.
+4. Desde la aplicación web basta con pagar en **Créditos**: al volver, el pago se confirma solo. Desde Postman, **Checkout PayPhone** guarda en `urlPagoLocal` la dirección que debes abrir (la aplicación web la redirige al formulario de PayPhone). Después de pagar, la página muestra el `id`. Cópialo en `payphoneId` y ejecuta **Confirmar PayPhone** antes de 5 minutos, porque si no se confirma a tiempo PayPhone revierte el cobro.
 
 Cada pasarela se activa por separado: activar PayPhone no vuelve real a PayPal.
 
@@ -235,6 +256,7 @@ El perfil `real` levanta todos los servicios con integraciones reales, incluido 
 
 | Servicio | Función | Acceso |
 |----------|---------|--------|
+| `frontend` | Aplicación web React servida con Nginx | `http://localhost:5173` |
 | `backend` | API Django | `http://localhost:8000` |
 | `envio-worker` | Procesa la cola de envíos de campañas | Interno |
 | `email-worker` | Procesa la cola de correos | Interno |
@@ -331,9 +353,13 @@ backend/
 ├── config/               configuración de Django
 ├── tests/                pruebas unitarias, de integración y dobles de prueba
 └── whatsapp_api/         gateway de WhatsApp
+frontend/
+├── src/api/              cliente HTTP de la v1 y un archivo por módulo
+├── src/components/ui/    kit de componentes con Tailwind CSS
+├── src/pages/            una página por módulo y las pantallas de acceso
+└── docker/               configuración de Nginx (proxy de /api al backend)
 infra/
-├── pocketbase/           imagen del almacenamiento de archivos
-└── pasarela-local/       página local para los pagos de PayPhone
+└── pocketbase/           imagen del almacenamiento de archivos
 postman/
 ├── collections/          colecciones 01 a 05
 ├── environments/         entorno local

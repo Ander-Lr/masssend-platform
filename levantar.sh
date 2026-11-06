@@ -3,7 +3,7 @@
 #
 # Uso: ./levantar.sh [opciones]
 #   (sin opciones)      levanta el sistema completo en produccion: API, workers, WhatsApp,
-#                       Ollama, PocketBase, Postgres, Redis y Mailpit. Los datos se conservan
+#                       Ollama, PocketBase, Postgres, Redis, Mailpit y la web. Los datos se conservan
 #   -s, --sin NOMBRE    no usa una integracion aunque exista (ej. --sin paypal); se repite
 #   -a, --actualizar    trae lo ultimo de origin/main (git pull --ff-only) antes de levantar
 #       --qr            muestra el codigo QR para vincular WhatsApp (sal con Ctrl+C)
@@ -201,6 +201,11 @@ api_responde() {
   compose_prod exec -T backend python -c "import http.client as h; c=h.HTTPConnection('localhost',8000,timeout=3); c.request('GET','/api/v1/salud'); exit(0 if c.getresponse().status<500 else 1)" >/dev/null 2>&1
 }
 
+# El frontend responde y su proxy llega a la API.
+web_responde() {
+  compose_prod exec -T frontend wget -qO /dev/null http://127.0.0.1/api/v1/salud >/dev/null 2>&1
+}
+
 esperar_backend() {
   local intento
   for intento in $(seq 1 90); do
@@ -226,6 +231,9 @@ informe_prod() {
   if api_responde; then fila "API" "$VERDE" "lista" "http://localhost:${API_PORT}/api/v1/salud"
   else fila "API" "$ROJO" "no responde" "revisa: docker compose -p $PROYECTO_PROD logs backend"; fi
 
+  if web_responde; then fila "Web" "$VERDE" "lista" "http://localhost:${FRONTEND_PORT}"
+  else fila "Web" "$ROJO" "no responde" "revisa: docker compose -p $PROYECTO_PROD logs frontend"; fi
+
   IFS='|' read -r estado detalle <<< "$(estado_de gmail)"
   if [ "$estado" = "real" ]; then fila "Correos" "$VERDE" "Gmail" "llegan a los destinatarios reales"
   else fila "Correos" "$AMARILLO" "Mailpit" "http://localhost:${MAILPIT_PORT} (no salen a internet; $detalle)"; fi
@@ -239,7 +247,7 @@ informe_prod() {
       if [ "$nombre" = "paypal" ]; then
         case "$(valor PAYPAL_BASE_URL backend/.env.paypal)" in ""|*sandbox*) detalle="Sandbox (dinero ficticio)" ;; esac
       fi
-      [ "$nombre" = "payphone" ] && detalle="abre el pago en http://localhost:${FRONTEND_PORT}"
+      [ "$nombre" = "payphone" ] && detalle="paga desde http://localhost:${FRONTEND_PORT}/creditos"
       fila "$etiqueta" "$VERDE" "activo" "$detalle"
     else
       fila "$etiqueta" "$AMARILLO" "no configurado" "$detalle"
@@ -407,7 +415,7 @@ prueba() {
   info "  API:        http://localhost:${API_PORT}/api/v1/salud"
   if activa gmail; then info "  Correos:    llegan a tu Gmail"
   else info "  Correos:    http://localhost:${MAILPIT_PORT} (Mailpit)"; fi
-  info "  Pagos:      http://localhost:${FRONTEND_PORT} (abre ahi el url_pago de PayPhone)"
+  info "  Web:        http://localhost:${FRONTEND_PORT} (tambien abre ahi el url_pago de PayPhone)"
   info "  Asistente:  $([ "$IA" -eq 1 ] && echo "Ollama ($MODELO)" || echo "simulado (crea backend/.env.ia para Ollama)")"
   info "  Staff:      staff@prueba.local / clave-larga-123"
   echo

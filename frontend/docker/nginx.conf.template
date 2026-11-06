@@ -1,0 +1,44 @@
+# Sirve la aplicacion React y reenvia /api al backend dentro de la red de Docker.
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Adjuntos de campanas (video de hasta 16 MB) y CSV de contactos.
+    client_max_body_size 20m;
+
+    # PayPhone solo abre su formulario si el navegador llega desde el dominio registrado:
+    # se envia el origen, nunca la ruta completa.
+    add_header Referrer-Policy "origin" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+
+    # El DNS de Docker resuelve el backend en cada peticion: si se reinicia, nginx no se queda con una IP vieja.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    location /api/ {
+        set $api ${API_DESTINO};
+        proxy_pass $api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # El asistente de IA puede tardar en responder.
+        proxy_read_timeout 120s;
+    }
+
+    # Los archivos compilados llevan un hash en el nombre: se pueden guardar en cache.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # Cualquier otra ruta es de la aplicacion (React Router).
+    location / {
+        add_header Cache-Control "no-store";
+        add_header Referrer-Policy "origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        try_files $uri /index.html;
+    }
+}

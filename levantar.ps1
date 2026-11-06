@@ -225,6 +225,12 @@ function Api-Responde {
   return ($LASTEXITCODE -eq 0)
 }
 
+# El frontend responde y su proxy llega a la API.
+function Web-Responde {
+  Compose-Prod exec -T frontend wget -qO /dev/null http://127.0.0.1/api/v1/salud *> $null
+  return ($LASTEXITCODE -eq 0)
+}
+
 function Esperar-Backend {
   for ($n = 1; $n -le 90; $n++) {
     if (Api-Responde) { return $true }
@@ -243,6 +249,8 @@ function Informe-Prod {
   Titulo 'Estado de MassSend (produccion)'
   if (Api-Responde) { Fila 'API' 'Green' 'lista' "http://localhost:$($env:API_PORT)/api/v1/salud" }
   else { Fila 'API' 'Red' 'no responde' "revisa: docker compose -p $ProyectoProd logs backend" }
+  if (Web-Responde) { Fila 'Web' 'Green' 'lista' "http://localhost:$($env:FRONTEND_PORT)" }
+  else { Fila 'Web' 'Red' 'no responde' "revisa: docker compose -p $ProyectoProd logs frontend" }
 
   $gmail = Estado-De 'gmail'
   if ($gmail[1] -eq 'real') { Fila 'Correos' 'Green' 'Gmail' 'llegan a los destinatarios reales' }
@@ -258,7 +266,7 @@ function Informe-Prod {
         $url = Valor 'PAYPAL_BASE_URL' 'backend/.env.paypal'
         if ($url -eq '' -or $url -like '*sandbox*') { $detalle = 'Sandbox (dinero ficticio)' }
       }
-      if ($nombre -eq 'payphone') { $detalle = "abre el pago en http://localhost:$($env:FRONTEND_PORT)" }
+      if ($nombre -eq 'payphone') { $detalle = "paga desde http://localhost:$($env:FRONTEND_PORT)/creditos" }
       Fila $etiqueta 'Green' 'activo' $detalle
     } else {
       Fila $etiqueta 'Yellow' 'no configurado' $fila[2]
@@ -431,7 +439,7 @@ function Prueba {
   Info "  API:        http://localhost:$($env:API_PORT)/api/v1/salud"
   if ($script:Activas -contains 'gmail') { Info '  Correos:    llegan a tu Gmail' }
   else { Info "  Correos:    http://localhost:$($env:MAILPIT_PORT) (Mailpit)" }
-  Info "  Pagos:      http://localhost:$($env:FRONTEND_PORT) (abre ahi el url_pago de PayPhone)"
+  Info "  Web:        http://localhost:$($env:FRONTEND_PORT) (tambien abre ahi el url_pago de PayPhone)"
   if ($script:IA) { Info "  Asistente:  Ollama ($($script:Modelo))" }
   else { Info '  Asistente:  simulado (crea backend\.env.ia para Ollama)' }
   Info '  Staff:      staff@prueba.local / clave-larga-123'

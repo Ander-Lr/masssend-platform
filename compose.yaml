@@ -2,10 +2,11 @@
 # Servicios independientes (NO monolito): cada uno con su imagen,
 # su contenedor y comunicación por la red interna `masssend_network`.
 #
-#   Postman ─→ backend (Django:8000); el frontend entra en la fase siguiente
+#   navegador ─→ frontend (React + Nginx:5173) ─→ backend (Django:8000)
+#   Postman ─→ backend (Django:8000)
 #   backend ─→ whatsapp (Node:3001), ollama (11434), pocketbase (8080)
 #   whatsapp ─→ backend (webhooks autenticados) y pocketbase (archivos)
-#   solo el backend publica su puerto en el host
+#   en el host se publican el frontend, el backend y Mailpit
 #
 # Perfiles:
 #   real  sistema completo, con WhatsApp, Ollama, PocketBase y datos persistentes.
@@ -324,16 +325,33 @@ services:
       - masssend_network
     restart: unless-stopped
 
-  # Pagina local en el dominio registrado en PayPhone: abre el formulario de
-  # pago y muestra el id del retorno, mientras no exista el frontend.
-  pasarela-local:
-    profiles: [ci, real]
-    image: nginx:1.27-alpine
-    volumes:
-      - ./infra/pasarela-local/index.html:/usr/share/nginx/html/index.html:ro
-      - ./infra/pasarela-local/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  # Frontend React: sirve la aplicacion y reenvia /api al backend. Esta en el
+  # dominio registrado en PayPhone (localhost:5173), que solo abre su formulario
+  # si el navegador llega desde ahi.
+  frontend:
+    profiles: [real]
+    build:
+      context: ./frontend
+    environment:
+      API_DESTINO: http://backend:8000
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    networks:
+      - masssend_network
+    restart: unless-stopped
+
+  frontend-ci:
+    profiles: [ci]
+    build:
+      context: ./frontend
+    environment:
+      API_DESTINO: http://backend-ci:8000
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend-ci
     networks:
       - masssend_network
     restart: unless-stopped
