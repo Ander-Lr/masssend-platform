@@ -48,7 +48,7 @@ export default function TotpPage() {
           {cargando ? 'Verificando...' : 'Confirmar'}
         </PrimaryButton>
       </form>
-      <div style={{ textAlign: 'center', marginTop: 18 }}>
+      <div className="mt-[18px] text-center">
         <LinkButton onClick={cancelar}>Cancelar</LinkButton>
       </div>
     </AuthCard>

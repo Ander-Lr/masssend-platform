@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ESTADOS, progresoCampana } from '../../api/campanas'
 import Etiquetas from '../ui/Etiquetas'
+import Insignia from '../ui/Insignia'
+import Progreso, { Spinner } from '../ui/Progreso'
+import { BotonMini } from '../ui/Boton'
 
 const INTERVALO_MS = 3000
-
-function Spinner() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="girando" aria-hidden="true">
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  )
-}
 
 // Consulta el avance; mientras la campana esta en curso lo actualiza cada 3 segundos.
 function useProgreso(campana, onTermino) {
@@ -40,21 +35,19 @@ function useProgreso(campana, onTermino) {
 
 function BarraProgreso({ p, enCurso }) {
   return (
-    <div style={{ marginTop: 10 }}>
-      <div className="progreso-datos">
+    <div className="mt-2.5">
+      <div className="mb-1.5 flex flex-wrap gap-4 text-[0.75rem] text-gray-600">
         <span>Total: <strong>{p.total}</strong></span>
-        <span style={{ color: '#10b981' }}>Enviados: <strong>{p.enviados}</strong></span>
-        <span style={{ color: '#ef4444' }}>Fallidos: <strong>{p.fallidos}</strong></span>
-        {p.omitidos > 0 && <span style={{ color: '#6b7280' }}>Omitidos: <strong>{p.omitidos}</strong></span>}
-        {p.cancelados > 0 && <span style={{ color: '#6b7280' }}>Cancelados: <strong>{p.cancelados}</strong></span>}
-        {enCurso && <span style={{ color: '#92400e' }}>Pendientes: <strong>{p.pendientes}</strong></span>}
-        <span style={{ fontWeight: 700, color: enCurso ? '#92400e' : '#374151' }}>{p.porcentaje}%</span>
+        <span className="text-emerald-500">Enviados: <strong>{p.enviados}</strong></span>
+        <span className="text-red-500">Fallidos: <strong>{p.fallidos}</strong></span>
+        {p.omitidos > 0 && <span className="text-gray-500">Omitidos: <strong>{p.omitidos}</strong></span>}
+        {p.cancelados > 0 && <span className="text-gray-500">Cancelados: <strong>{p.cancelados}</strong></span>}
+        {enCurso && <span className="text-amber-800">Pendientes: <strong>{p.pendientes}</strong></span>}
+        <span className={`font-bold ${enCurso ? 'text-amber-800' : 'text-gray-700'}`}>{p.porcentaje}%</span>
       </div>
-      <div className="progreso-pista">
-        <div className={`progreso-relleno${enCurso ? ' activo' : ''}`} style={{ width: `${p.porcentaje}%` }} />
-      </div>
+      <Progreso porcentaje={p.porcentaje} activo={enCurso} />
       {enCurso && (
-        <p style={{ fontSize: '0.7rem', color: '#92400e', marginTop: 5, fontWeight: 500 }}>
+        <p className="mt-1.5 text-[0.7rem] font-medium text-amber-800">
           Enviando mensajes con pausas para cuidar tu número de WhatsApp. Se actualiza cada 3 segundos.
         </p>
       )}
@@ -68,35 +61,35 @@ export default function TarjetaCampana({ campana, onLanzar, onEditar, onEliminar
   const progreso = useProgreso(campana, onTermino)
 
   return (
-    <div className={`tarjeta-campana${enCurso ? ' en-curso' : ''}`}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{campana.nombre}</span>
-            <span className={`insignia insignia-${estado.clase}`}>{estado.label}</span>
-            {enCurso && <span className="ejecutando"><Spinner /> Enviando...</span>}
-            {campana.tiene_adjunto && <span className="insignia insignia-gris">Con adjunto</span>}
+    <div className={`rounded-xl border-l-4 bg-white px-5 py-[18px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors ${enCurso ? 'border-amber-500' : 'border-transparent'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-60 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
+            <span className="text-[0.95rem] font-bold">{campana.nombre}</span>
+            <Insignia color={estado.clase}>{estado.label}</Insignia>
+            {enCurso && <span className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-amber-800"><Spinner /> Enviando...</span>}
+            {campana.tiene_adjunto && <Insignia>Con adjunto</Insignia>}
             <Etiquetas lista={campana.etiquetas} vacio="Todos los contactos" />
           </div>
-          <p className="mensaje-campana">{campana.mensaje}</p>
+          <p className="line-clamp-2 whitespace-pre-wrap text-[0.8rem] text-gray-400">{campana.mensaje}</p>
           {progreso && progreso.total > 0 && <BarraProgreso p={progreso} enCurso={enCurso} />}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div className="flex shrink-0 gap-2">
           {campana.estado === 'borrador' && (
             <>
-              <button className="boton-accion violeta" disabled={ocupada} onClick={() => onLanzar(campana)}>
+              <BotonMini grande color="indigo" disabled={ocupada} onClick={() => onLanzar(campana)}>
                 {ocupada ? <><Spinner /> Lanzando...</> : 'Lanzar'}
-              </button>
-              <button className="boton-accion gris" onClick={() => onEditar(campana)}>Editar</button>
+              </BotonMini>
+              <BotonMini grande onClick={() => onEditar(campana)}>Editar</BotonMini>
             </>
           )}
           {enCurso && (
-            <button className="boton-accion rojo" disabled={ocupada} onClick={() => onCancelar(campana)}>
+            <BotonMini grande color="rojo" disabled={ocupada} onClick={() => onCancelar(campana)}>
               {ocupada ? 'Cancelando...' : 'Cancelar envío'}
-            </button>
+            </BotonMini>
           )}
-          {!enCurso && <button className="boton-accion rojo" onClick={() => onEliminar(campana)}>Eliminar</button>}
+          {!enCurso && <BotonMini grande color="rojo" onClick={() => onEliminar(campana)}>Eliminar</BotonMini>}
         </div>
       </div>
     </div>

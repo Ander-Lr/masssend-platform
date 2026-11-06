@@ -1,12 +1,14 @@
+import { Ayuda, Etiqueta, claseEntrada } from '../ui/Campo'
+
 export default function FormField({
   label, type = 'text', value, onChange, required = true, placeholder, autoFocus,
   autoComplete, inputMode, maxLength, codigo = false, ayuda,
 }) {
   return (
-    <div className="campo">
-      <label>{label}</label>
+    <div className="mb-4">
+      <Etiqueta>{label}</Etiqueta>
       <input
-        className={`entrada${codigo ? ' entrada-codigo' : ''}`}
+        className={`${claseEntrada} ${codigo ? 'text-center text-xl font-bold tracking-[0.4em]' : ''}`}
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -17,7 +19,7 @@ export default function FormField({
         inputMode={inputMode}
         maxLength={maxLength}
       />
-      {ayuda && <p className="texto-suave" style={{ fontSize: '0.76rem', marginTop: 6 }}>{ayuda}</p>}
+      {ayuda && <Ayuda>{ayuda}</Ayuda>}
     </div>
   )
 }

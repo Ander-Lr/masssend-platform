@@ -5,6 +5,10 @@ import FormField from '../components/auth/FormField'
 import AlertBox from '../components/auth/AlertBox'
 import LinkButton from '../components/auth/LinkButton'
 import MfaEnrolamiento from '../components/auth/MfaEnrolamiento'
+import Boton from '../components/ui/Boton'
+import Insignia from '../components/ui/Insignia'
+import Pagina from '../components/ui/Pagina'
+import Tarjeta from '../components/ui/Tarjeta'
 import { cambiarContrasena, desactivarMfa } from '../api/identidad'
 import { useAuth } from '../context/AuthContext'
 
@@ -40,17 +44,15 @@ function DobleFactor() {
   }
 
   return (
-    <div className="tarjeta">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-        <h2 className="tarjeta-titulo" style={{ margin: 0 }}>Verificación en dos pasos</h2>
-        <span className={`insignia ${usuario.mfa_activo ? 'insignia-verde' : 'insignia-roja'}`}>
-          {usuario.mfa_activo ? 'Activa' : 'Inactiva'}
-        </span>
+    <Tarjeta>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <h2 className="text-base font-bold">Verificación en dos pasos</h2>
+        <Insignia color={usuario.mfa_activo ? 'verde' : 'roja'}>{usuario.mfa_activo ? 'Activa' : 'Inactiva'}</Insignia>
       </div>
 
       {usuario.mfa_activo && !desactivando && (
         <>
-          <p className="texto-suave" style={{ marginBottom: 14, lineHeight: 1.5 }}>
+          <p className="mb-3.5 text-[0.88rem] leading-normal text-gray-500">
             Cada inicio de sesión pide el código de tu aplicación de autenticación además de la contraseña.
           </p>
           <LinkButton peligro onClick={() => { setDesactivando(true); setError('') }}>
@@ -66,30 +68,24 @@ function DobleFactor() {
           </AlertBox>
           <FormField label="Confirma tu contraseña" type="password" value={contrasena} onChange={setContrasena} autoComplete="current-password" autoFocus />
           <AlertBox>{error}</AlertBox>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button type="submit" className="boton boton-peligro" disabled={cargando}>
-              {cargando ? 'Desactivando...' : 'Confirmar desactivación'}
-            </button>
-            <button type="button" className="boton boton-secundario" onClick={() => { setDesactivando(false); setContrasena('') }}>
-              Cancelar
-            </button>
+          <div className="flex gap-2.5">
+            <Boton type="submit" variante="peligro" disabled={cargando}>{cargando ? 'Desactivando...' : 'Confirmar desactivación'}</Boton>
+            <Boton variante="secundario" onClick={() => { setDesactivando(false); setContrasena('') }}>Cancelar</Boton>
           </div>
         </form>
       )}
 
       {!usuario.mfa_activo && !activando && (
         <>
-          <p className="texto-suave" style={{ marginBottom: 14, lineHeight: 1.5 }}>
+          <p className="mb-3.5 text-[0.88rem] leading-normal text-gray-500">
             Protege tu cuenta con un código adicional generado por Google Authenticator o Microsoft Authenticator.
           </p>
-          <button className="boton boton-primario" onClick={() => setActivando(true)}>
-            Activar verificación en dos pasos
-          </button>
+          <Boton onClick={() => setActivando(true)}>Activar verificación en dos pasos</Boton>
         </>
       )}
 
       {!usuario.mfa_activo && activando && <MfaEnrolamiento onActivado={alActivar} />}
-    </div>
+    </Tarjeta>
   )
 }
 
@@ -122,36 +118,27 @@ function CambioContrasena() {
   }
 
   return (
-    <div className="tarjeta">
-      <h2 className="tarjeta-titulo">Cambiar contraseña</h2>
-      <p className="texto-suave" style={{ marginBottom: 16 }}>Al cambiarla se cierran las sesiones abiertas en todos tus dispositivos.</p>
+    <Tarjeta titulo="Cambiar contraseña">
+      <p className="mb-4 text-[0.88rem] text-gray-500">Al cambiarla se cierran las sesiones abiertas en todos tus dispositivos.</p>
       <form onSubmit={enviar}>
         <FormField label="Contraseña actual" type="password" value={actual} onChange={setActual} autoComplete="current-password" />
         <FormField label="Nueva contraseña (mínimo 8 caracteres)" type="password" value={nueva} onChange={setNueva} autoComplete="new-password" />
         <FormField label="Confirmar nueva contraseña" type="password" value={confirmacion} onChange={setConfirmacion} autoComplete="new-password" />
         <AlertBox>{error}</AlertBox>
-        <button type="submit" className="boton boton-primario" disabled={cargando}>
-          {cargando ? 'Guardando...' : 'Cambiar contraseña'}
-        </button>
+        <Boton type="submit" disabled={cargando}>{cargando ? 'Guardando...' : 'Cambiar contraseña'}</Boton>
       </form>
-    </div>
+    </Tarjeta>
   )
 }
 
 export default function SeguridadPage() {
   const { usuario } = useAuth()
   return (
-    <div className="pagina">
-      <div className="pagina-encabezado">
-        <div>
-          <h1 className="pagina-titulo">Seguridad de la cuenta</h1>
-          <p className="pagina-subtitulo">Cuenta: <strong>{usuario.correo}</strong></p>
-        </div>
-      </div>
-      <div className="rejilla" style={{ maxWidth: 960, alignItems: 'start' }}>
+    <Pagina titulo="Seguridad de la cuenta" subtitulo={<>Cuenta: <strong>{usuario.correo}</strong></>} fondo="bg-lienzo">
+      <div className="grid max-w-[960px] grid-cols-[repeat(auto-fit,minmax(280px,1fr))] items-start gap-4">
         <DobleFactor />
         <CambioContrasena />
       </div>
-    </div>
+    </Pagina>
   )
 }

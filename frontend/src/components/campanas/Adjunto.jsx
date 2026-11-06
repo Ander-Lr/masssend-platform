@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { descargarAdjunto } from '../../api/campanas'
 
+export function ArchivoPendiente({ children }) {
+  return <div className="mb-1.5 rounded-md bg-black/5 px-2.5 py-2 text-[0.78rem] text-gray-700">{children}</div>
+}
+
 // El adjunto se pide con el JWT y se muestra desde una URL local del navegador.
 export default function Adjunto({ campanaId, compacto = false }) {
   const [archivo, setArchivo] = useState(null)
@@ -22,10 +26,10 @@ export default function Adjunto({ campanaId, compacto = false }) {
     }
   }, [campanaId])
 
-  if (fallo) return <div className="adjunto-nuevo">No se pudo cargar el adjunto</div>
-  if (!archivo) return <div className="adjunto-nuevo">Cargando adjunto...</div>
-  const estilo = { display: 'block', maxWidth: '100%', maxHeight: compacto ? 180 : 320, borderRadius: 6, marginBottom: 6 }
+  if (fallo) return <ArchivoPendiente>No se pudo cargar el adjunto</ArchivoPendiente>
+  if (!archivo) return <ArchivoPendiente>Cargando adjunto...</ArchivoPendiente>
+  const clase = `mb-1.5 block max-w-full rounded-md ${compacto ? 'max-h-[180px]' : 'max-h-80'}`
   return archivo.video
-    ? <video src={archivo.url} controls style={estilo} />
-    : <img src={archivo.url} alt="Adjunto de la campaña" style={estilo} />
+    ? <video src={archivo.url} controls className={clase} />
+    : <img src={archivo.url} alt="Adjunto de la campaña" className={clase} />
 }

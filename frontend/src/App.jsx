@@ -26,7 +26,7 @@ import AsistentePage from './pages/AsistentePage'
 import { recordarDestino } from './pages/auth/pasos'
 
 function Cargando() {
-  return <div className="loading" style={{ height: '100vh' }}>Cargando...</div>
+  return <div className="flex h-screen items-center justify-center text-[0.9rem] text-gray-500">Cargando...</div>
 }
 
 // Solo con sesion. Sin ella, recuerda la pagina pedida y va al login.

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { claseEnlace } from '../../components/ui/clases'
 import AuthCard from '../../components/auth/AuthCard'
 import FormField from '../../components/auth/FormField'
 import AlertBox from '../../components/auth/AlertBox'
@@ -40,12 +41,12 @@ export default function LoginPage() {
         <PrimaryButton loading={cargando}>{cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}</PrimaryButton>
       </form>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: '0.78rem' }}>
-        <Link className="boton-enlace" to="/recuperar">¿Olvidaste tu contraseña?</Link>
-        <Link className="boton-enlace" to="/registro">Crear cuenta nueva</Link>
+      <div className="mt-3.5 flex justify-between">
+        <Link className={claseEnlace} to="/recuperar">¿Olvidaste tu contraseña?</Link>
+        <Link className={claseEnlace} to="/registro">Crear cuenta nueva</Link>
       </div>
 
-      <div className="separador">o</div>
+      <div className="my-5 flex items-center gap-2.5 text-[0.8rem] text-gray-400 before:h-px before:flex-1 before:bg-gray-200 after:h-px after:flex-1 after:bg-gray-200">o</div>
       <GoogleButton onError={setError} />
     </AuthCard>
   )

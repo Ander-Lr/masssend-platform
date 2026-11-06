@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { sileo } from 'sileo'
 import AlertBox from '../components/auth/AlertBox'
+import Boton from '../components/ui/Boton'
+import Pagina, { Vacio } from '../components/ui/Pagina'
+import Pestanas from '../components/ui/Pestanas'
 import { confirmar } from '../components/ui/confirmar'
 import FormularioCampana from '../components/campanas/FormularioCampana'
 import ConfirmarLanzamiento from '../components/campanas/ConfirmarLanzamiento'
@@ -122,31 +125,20 @@ export default function CampanasPage() {
   const alTerminar = useCallback(p => actualizar(p.campana_id, { estado: p.estado }), [])
 
   return (
-    <div className="pagina" style={{ background: '#f8f9fa' }}>
-      <div className="pagina-encabezado" style={{ alignItems: 'center' }}>
-        <h1 className="pagina-titulo">Campañas</h1>
-        <button className="boton boton-primario" style={{ padding: '9px 22px' }} onClick={() => setFormulario('nueva')}>+ Nueva campaña</button>
-      </div>
-
-      <div className="pestanas" role="tablist">
-        {PESTANAS.map(p => (
-          <button key={p.valor} role="tab" aria-selected={estado === p.valor} className={`pestana${estado === p.valor ? ' activa' : ''}`} onClick={() => setEstado(p.valor)}>
-            {p.label}
-          </button>
-        ))}
-      </div>
+    <Pagina titulo="Campañas" acciones={<Boton className="px-[22px]" onClick={() => setFormulario('nueva')}>+ Nueva campaña</Boton>}>
+      <Pestanas opciones={PESTANAS} valor={estado} onCambiar={setEstado} />
 
       <AlertBox>{error}</AlertBox>
 
-      {cargando && campanas.length === 0 && <div style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>Cargando campañas...</div>}
+      {cargando && campanas.length === 0 && <Vacio>Cargando campañas...</Vacio>}
       {!cargando && campanas.length === 0 && !error && (
-        <div style={{ textAlign: 'center', color: '#aaa', padding: 60 }}>
+        <Vacio>
           <p>{estado ? 'No hay campañas en este estado.' : 'No hay campañas creadas.'}</p>
-          {!estado && <p style={{ fontSize: '0.82rem', marginTop: 6 }}>Crea una nueva campaña para comenzar.</p>}
-        </div>
+          {!estado && <p className="mt-1.5 text-[0.82rem]">Crea una nueva campaña para comenzar.</p>}
+        </Vacio>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="flex flex-col gap-3">
         {campanas.map(c => (
           <TarjetaCampana
             key={c.id}
@@ -162,8 +154,8 @@ export default function CampanasPage() {
       </div>
 
       {cursor && (
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button className="boton boton-secundario" disabled={cargando} onClick={verMas}>{cargando ? 'Cargando...' : 'Ver más'}</button>
+        <div className="mt-4 text-center">
+          <Boton variante="secundario" disabled={cargando} onClick={verMas}>{cargando ? 'Cargando...' : 'Ver más'}</Boton>
         </div>
       )}
 
@@ -176,6 +168,6 @@ export default function CampanasPage() {
         />
       )}
       {porLanzar && <ConfirmarLanzamiento campana={porLanzar} onCerrar={() => setPorLanzar(null)} onConfirmar={lanzar} />}
-    </div>
+    </Pagina>
   )
 }

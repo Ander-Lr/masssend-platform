@@ -1,6 +1,6 @@
 # MassSend Frontend
 
-Interfaz web de MassSend en React y Vite. Consume solo la API v1 del backend (`/api/v1/`).
+Interfaz web de MassSend en React, Vite y Tailwind CSS. Consume solo la API v1 del backend (`/api/v1/`).
 
 ## Desarrollo
 
@@ -35,7 +35,13 @@ Para el acceso con Google, la URI de redireccionamiento autorizada en Google Clo
 src/
 ├── api/          cliente HTTP de la v1 y un archivo por módulo
 ├── context/      sesión, tokens JWT y doble factor
-├── components/   auth (tarjetas y formularios) y layout (menú lateral)
+├── components/   ui (kit de Tailwind), auth, layout (menú lateral) y campanas
 ├── pages/        auth (pantallas sin sesión) y una página por módulo
 └── modulos.js    menú lateral y accesos de Inicio
 ```
+
+## Estilos
+
+Todos los estilos usan Tailwind CSS v4 con el plugin oficial de Vite. Los colores de la marca (verde MassSend, fondo, burbujas de WhatsApp, PayPal y PayPhone) se definen una sola vez en el bloque `@theme` de `src/index.css` y se usan como `bg-marca`, `text-tinta`, `bg-chat`, etc.
+
+Las piezas que se repiten viven en `src/components/ui/`: botones, tarjetas, insignias, campos, tablas, modales, estadísticas, pestañas y barras de progreso. Una pantalla nueva se arma con esas piezas y utilidades de Tailwind, sin hojas de estilo propias.

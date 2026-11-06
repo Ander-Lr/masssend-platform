@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { claseEnlace } from '../../components/ui/clases'
 import AuthCard from '../../components/auth/AuthCard'
 import FormField from '../../components/auth/FormField'
 import AlertBox from '../../components/auth/AlertBox'
@@ -49,8 +50,8 @@ export default function ResetPasswordPage() {
       ) : (
         <AlertBox>{error}</AlertBox>
       )}
-      <div style={{ textAlign: 'center', marginTop: 18 }}>
-        <Link className="boton-enlace" to="/login" state={{ correo }}>Ir a iniciar sesión</Link>
+      <div className="mt-[18px] text-center">
+        <Link className={claseEnlace} to="/login" state={{ correo }}>Ir a iniciar sesión</Link>
       </div>
     </AuthCard>
   )

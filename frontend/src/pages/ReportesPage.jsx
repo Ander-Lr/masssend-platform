@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
 import AlertBox from '../components/auth/AlertBox'
+import Boton from '../components/ui/Boton'
+import Estadistica, { Estadisticas } from '../components/ui/Estadistica'
+import Insignia from '../components/ui/Insignia'
+import Pagina, { Vacio } from '../components/ui/Pagina'
+import Progreso from '../components/ui/Progreso'
+import Tarjeta from '../components/ui/Tarjeta'
+import { claseFiltro } from '../components/ui/Campo'
 import { reporte as pedirReporte } from '../api/envio'
 import { ESTADOS } from '../api/campanas'
 
@@ -19,15 +26,15 @@ function completarDias(porDia, desde, hasta) {
 const iso2 = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const diaCorto = dia => new Date(`${dia}T00:00:00`).toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
 
-function Tasa({ titulo, valor, color, detalle }) {
+function Tasa({ titulo, valor, color, clase, detalle }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: 6 }}>
-        <span style={{ fontWeight: 600 }}>{titulo}</span>
-        <span style={{ fontWeight: 700, color }}>{valor}%</span>
+    <div className="mb-4">
+      <div className="mb-1.5 flex justify-between text-[0.82rem]">
+        <span className="font-semibold">{titulo}</span>
+        <span className={`font-bold ${clase}`}>{valor}%</span>
       </div>
-      <div className="progreso-pista"><div className="progreso-relleno" style={{ width: `${Math.min(valor, 100)}%`, background: color }} /></div>
-      <p className="texto-suave" style={{ fontSize: '0.72rem', marginTop: 4 }}>{detalle}</p>
+      <Progreso porcentaje={valor} color={color} />
+      <p className="mt-1 text-[0.72rem] text-gray-500">{detalle}</p>
     </div>
   )
 }
@@ -36,29 +43,35 @@ function Tasa({ titulo, valor, color, detalle }) {
 function GraficaBarras({ datos }) {
   const conActividad = datos.some(d => d.enviados || d.recibidos)
   if (!conActividad) {
-    return <div className="grafica-vacia">Sin mensajes en el periodo seleccionado</div>
+    return <div className="flex h-[170px] items-center justify-center text-[0.85rem] text-gray-300">Sin mensajes en el periodo seleccionado</div>
   }
   const maximo = Math.max(...datos.map(d => Math.max(d.enviados, d.recibidos)), 1)
   const cadaCuanto = Math.ceil(datos.length / 15)
+  // La altura de cada barra depende de los datos: es el unico estilo calculado en linea.
+  const alto = valor => ({ height: `${(valor / maximo) * 100}%` })
   return (
     <>
-      <div className="grafica" role="img" aria-label="Mensajes enviados y recibidos por día">
+      <div className="flex h-[170px] items-end gap-1 overflow-x-auto overflow-y-hidden" role="img" aria-label="Mensajes enviados y recibidos por día">
         {datos.map((d, i) => (
-          <div key={d.dia} className="grafica-dia" title={`${diaCorto(d.dia)}: ${d.enviados} enviados, ${d.recibidos} recibidos`}>
-            <div className="grafica-barras">
-              <div style={{ height: `${(d.enviados / maximo) * 100}%`, background: '#6366f1', minHeight: d.enviados ? 4 : 0 }} />
-              <div style={{ height: `${(d.recibidos / maximo) * 100}%`, background: '#10b981', minHeight: d.recibidos ? 4 : 0 }} />
+          <div key={d.dia} className="flex min-w-3.5 flex-1 flex-col items-center gap-1" title={`${diaCorto(d.dia)}: ${d.enviados} enviados, ${d.recibidos} recibidos`}>
+            <div className="flex h-[140px] w-full items-end gap-0.5">
+              <div className={`flex-1 rounded-t-[3px] bg-indigo-500 transition-[height] ${d.enviados ? 'min-h-1' : ''}`} style={alto(d.enviados)} />
+              <div className={`flex-1 rounded-t-[3px] bg-emerald-500 transition-[height] ${d.recibidos ? 'min-h-1' : ''}`} style={alto(d.recibidos)} />
             </div>
-            <span>{i % cadaCuanto === 0 ? diaCorto(d.dia) : ''}</span>
+            <span className="h-3.5 whitespace-nowrap text-[0.62rem] text-gray-400">{i % cadaCuanto === 0 ? diaCorto(d.dia) : ''}</span>
           </div>
         ))}
       </div>
-      <div className="leyenda">
-        <span><i style={{ background: '#6366f1' }} />Enviados</span>
-        <span><i style={{ background: '#10b981' }} />Recibidos</span>
+      <div className="mt-2.5 flex gap-4 text-[0.75rem] text-gray-500">
+        <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-indigo-500" />Enviados</span>
+        <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-emerald-500" />Recibidos</span>
       </div>
     </>
   )
+}
+
+function Fila({ etiqueta, children }) {
+  return <div className="flex items-center justify-between border-b border-gray-100 py-2 text-[0.85rem] last:border-b-0">{etiqueta}{children}</div>
 }
 
 export default function ReportesPage() {
@@ -91,75 +104,74 @@ export default function ReportesPage() {
 
   const r = datos?.resumen
   const tarjetas = r ? [
-    { label: 'Enviados', valor: r.enviados, clase: 'purple' },
-    { label: 'Entregados', valor: r.entregados, clase: 'blue' },
-    { label: 'Leídos', valor: r.leidos, clase: 'green' },
-    { label: 'Fallidos', valor: r.fallidos, clase: 'red' },
-    { label: 'Pendientes', valor: r.pendientes, clase: '' },
-    { label: 'Respuestas recibidas', valor: r.recibidos, clase: 'green' },
+    { label: 'Enviados', valor: r.enviados, color: 'morado' },
+    { label: 'Entregados', valor: r.entregados, color: 'azul' },
+    { label: 'Leídos', valor: r.leidos, color: 'verde' },
+    { label: 'Fallidos', valor: r.fallidos, color: 'rojo' },
+    { label: 'Pendientes', valor: r.pendientes, color: 'normal' },
+    { label: 'Respuestas recibidas', valor: r.recibidos, color: 'verde' },
   ] : []
 
   return (
-    <div className="pagina" style={{ background: '#f8f9fa' }}>
-      <h1 className="pagina-titulo" style={{ marginBottom: 20 }}>Reportes de mensajería</h1>
-
-      <form className="filtros" style={{ alignItems: 'center' }} onSubmit={aplicar}>
-        <label className="texto-suave" style={{ fontSize: '0.82rem' }}>Desde</label>
-        <input type="date" className="entrada" value={desde} max={hasta} onChange={e => setDesde(e.target.value)} />
-        <label className="texto-suave" style={{ fontSize: '0.82rem' }}>Hasta</label>
-        <input type="date" className="entrada" value={hasta} min={desde} max={iso(new Date())} onChange={e => setHasta(e.target.value)} />
-        <button type="submit" className="boton boton-primario" style={{ padding: '7px 22px' }}>Aplicar</button>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[7, 30, 90].map(d => <button type="button" key={d} className="pestana" onClick={() => rapido(d)}>{d} días</button>)}
+    <Pagina titulo="Reportes de mensajería">
+      <form className="mb-[18px] flex flex-wrap items-center gap-2.5" onSubmit={aplicar}>
+        <label className="text-[0.82rem] text-gray-500">Desde</label>
+        <input type="date" className={claseFiltro} value={desde} max={hasta} onChange={e => setDesde(e.target.value)} />
+        <label className="text-[0.82rem] text-gray-500">Hasta</label>
+        <input type="date" className={claseFiltro} value={hasta} min={desde} max={iso(new Date())} onChange={e => setHasta(e.target.value)} />
+        <Boton type="submit" className="px-[22px] py-[7px]">Aplicar</Boton>
+        <div className="flex gap-1.5">
+          {[7, 30, 90].map(d => (
+            <button type="button" key={d} onClick={() => rapido(d)}
+              className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-[0.82rem] text-gray-700 hover:border-gray-300">
+              {d} días
+            </button>
+          ))}
         </div>
       </form>
 
       <AlertBox>{error}</AlertBox>
-      {!datos && !error && <div style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>Cargando reporte...</div>}
+      {!datos && !error && <Vacio>Cargando reporte...</Vacio>}
 
       {datos && (
         <>
-          <div className="stats-grid">
-            {tarjetas.map(t => (
-              <div key={t.label} className={`stat-card ${t.clase}`}>
-                <div className="stat-num">{t.valor}</div>
-                <div className="stat-label">{t.label}</div>
+          <Estadisticas>
+            {tarjetas.map(t => <Estadistica key={t.label} valor={t.valor} etiqueta={t.label} color={t.color} />)}
+          </Estadisticas>
+
+          <div className="mb-4 grid items-start gap-4 lg:grid-cols-3">
+            <Tarjeta titulo="Actividad por día" className="min-w-0 lg:col-span-2">
+              <div className="mt-4"><GraficaBarras datos={completarDias(datos.por_dia, datos.desde, datos.hasta)} /></div>
+            </Tarjeta>
+            <Tarjeta titulo="Efectividad">
+              <div className="mt-4">
+                <Tasa titulo="Tasa de entrega" valor={r.tasa_entrega} color="#3b82f6" clase="text-blue-500" detalle="Mensajes que llegaron al teléfono del contacto." />
+                <Tasa titulo="Tasa de lectura" valor={r.tasa_lectura} color="#10b981" clase="text-emerald-500" detalle="Mensajes que el contacto abrió." />
               </div>
-            ))}
+            </Tarjeta>
           </div>
 
-          <div className="rejilla" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'start', marginBottom: 16 }}>
-            <div className="tarjeta" style={{ gridColumn: 'span 2', minWidth: 0 }}>
-              <h2 className="tarjeta-titulo" style={{ marginBottom: 16 }}>Actividad por día</h2>
-              <GraficaBarras datos={completarDias(datos.por_dia, datos.desde, datos.hasta)} />
-            </div>
-            <div className="tarjeta">
-              <h2 className="tarjeta-titulo" style={{ marginBottom: 16 }}>Efectividad</h2>
-              <Tasa titulo="Tasa de entrega" valor={r.tasa_entrega} color="#3b82f6" detalle="Mensajes que llegaron al teléfono del contacto." />
-              <Tasa titulo="Tasa de lectura" valor={r.tasa_lectura} color="#10b981" detalle="Mensajes que el contacto abrió." />
-            </div>
-          </div>
-
-          <div className="rejilla" style={{ alignItems: 'start' }}>
-            <div className="tarjeta">
-              <h2 className="tarjeta-titulo" style={{ marginBottom: 12 }}>Campañas</h2>
-              {Object.keys(datos.campanas).length === 0 && <p className="texto-suave">Aún no tienes campañas.</p>}
-              {Object.entries(datos.campanas).map(([estado, total]) => (
-                <div key={estado} className="fila-resumen">
-                  <span className={`insignia insignia-${ESTADOS[estado]?.clase || 'gris'}`}>{ESTADOS[estado]?.label || estado}</span>
-                  <strong>{total}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="tarjeta">
-              <h2 className="tarjeta-titulo" style={{ marginBottom: 12 }}>Contactos</h2>
-              <div className="fila-resumen"><span>Total</span><strong>{datos.contactos.total}</strong></div>
-              <div className="fila-resumen"><span>Activos</span><strong style={{ color: '#10b981' }}>{datos.contactos.total - datos.contactos.dados_de_baja}</strong></div>
-              <div className="fila-resumen"><span>Dados de baja</span><strong style={{ color: '#ef4444' }}>{datos.contactos.dados_de_baja}</strong></div>
-            </div>
+          <div className="grid items-start gap-4 md:grid-cols-2">
+            <Tarjeta titulo="Campañas">
+              <div className="mt-3">
+                {Object.keys(datos.campanas).length === 0 && <p className="text-[0.88rem] text-gray-500">Aún no tienes campañas.</p>}
+                {Object.entries(datos.campanas).map(([estado, total]) => (
+                  <Fila key={estado} etiqueta={<Insignia color={ESTADOS[estado]?.clase}>{ESTADOS[estado]?.label || estado}</Insignia>}>
+                    <strong>{total}</strong>
+                  </Fila>
+                ))}
+              </div>
+            </Tarjeta>
+            <Tarjeta titulo="Contactos">
+              <div className="mt-3">
+                <Fila etiqueta="Total"><strong>{datos.contactos.total}</strong></Fila>
+                <Fila etiqueta="Activos"><strong className="text-emerald-500">{datos.contactos.total - datos.contactos.dados_de_baja}</strong></Fila>
+                <Fila etiqueta="Dados de baja"><strong className="text-red-500">{datos.contactos.dados_de_baja}</strong></Fila>
+              </div>
+            </Tarjeta>
           </div>
         </>
       )}
-    </div>
+    </Pagina>
   )
 }

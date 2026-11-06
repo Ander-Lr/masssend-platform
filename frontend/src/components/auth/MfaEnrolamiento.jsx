@@ -38,22 +38,22 @@ export default function MfaEnrolamiento({ tokenDesafio, onActivado }) {
   if (!datos) {
     return error
       ? <AlertBox>{error}</AlertBox>
-      : <p className="texto-suave" style={{ textAlign: 'center' }}>Generando código QR...</p>
+      : <p className="text-center text-[0.88rem] text-gray-500">Generando código QR...</p>
   }
 
   return (
     <form onSubmit={confirmar}>
-      <ol className="texto-suave" style={{ paddingLeft: 18, marginBottom: 14, lineHeight: 1.6 }}>
+      <ol className="mb-3.5 list-decimal pl-[18px] text-[0.88rem] leading-relaxed text-gray-500">
         <li>Instala Google Authenticator o Microsoft Authenticator.</li>
         <li>Escanea este código QR desde la aplicación.</li>
         <li>Escribe el código de 6 dígitos que aparece.</li>
       </ol>
       <img src={datos.qr} alt="Código QR para el autenticador" width={200} height={200}
-        style={{ display: 'block', margin: '0 auto 12px', border: '1px solid #e5e7eb', borderRadius: 8 }} />
-      <p className="texto-suave" style={{ fontSize: '0.78rem', textAlign: 'center', marginBottom: 16 }}>
+        className="mx-auto mb-3 block rounded-lg border border-gray-200" />
+      <p className="mb-4 text-center text-[0.78rem] text-gray-500">
         ¿No puedes escanear? Ingresa esta clave manualmente:
         <br />
-        <code style={{ fontSize: '0.85rem', color: '#1a1a2e', wordBreak: 'break-all' }}>{datos.clave_manual}</code>
+        <code className="break-all text-[0.85rem] text-tinta">{datos.clave_manual}</code>
       </p>
       <CodigoField label="Código del autenticador" value={codigo} onChange={setCodigo} />
       <AlertBox>{error}</AlertBox>

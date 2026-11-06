@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { estadoAsistente, preguntar } from '../api/ia'
+import Boton from '../components/ui/Boton'
+import Insignia from '../components/ui/Insignia'
+import { claseEntrada } from '../components/ui/Campo'
 
 // Asistente de IA local con Ollama: la pregunta se procesa en el propio servidor.
 const SUGERENCIAS = [
@@ -14,11 +17,11 @@ const TURNOS_DE_CONTEXTO = 10
 function EstadoModelo({ estado }) {
   if (!estado) return null
   const listo = estado.disponible && estado.modelo_descargado
-  const clase = listo ? 'insignia-verde' : estado.disponible ? 'insignia-amarilla' : 'insignia-roja'
+  const color = listo ? 'verde' : estado.disponible ? 'amarilla' : 'roja'
   const texto = listo
     ? `Asistente listo · ${estado.modelo}`
     : estado.disponible ? `Falta descargar ${estado.modelo}` : 'Asistente no disponible'
-  return <span className={`insignia ${clase}`} style={{ padding: '6px 12px', fontSize: '0.78rem' }}>{texto}</span>
+  return <Insignia color={color} className="px-3 py-1.5 text-[0.78rem]">{texto}</Insignia>
 }
 
 export default function AsistentePage() {
@@ -67,37 +70,41 @@ export default function AsistentePage() {
   }
 
   return (
-    <div className="pagina" style={{ display: 'flex', flexDirection: 'column' }}>
-      <div className="pagina-encabezado" style={{ marginBottom: 0 }}>
+    <div className="flex flex-1 flex-col overflow-hidden bg-lienzo px-4 py-5 sm:px-8 sm:py-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="pagina-titulo">Asistente IA</h1>
-          <p className="pagina-subtitulo">
+          <h1 className="text-[1.4rem] font-bold">Asistente IA</h1>
+          <p className="mt-1 text-[0.88rem] text-gray-500">
             Modelo de IA local ejecutado con Ollama. Pregunta cómo usar MassSend o pide que te redacte un mensaje de campaña.
           </p>
         </div>
         <EstadoModelo estado={estado} />
       </div>
 
-      <div ref={scrollRef} className="tarjeta" style={{ flex: 1, overflowY: 'auto', margin: '18px 0', padding: 18, minHeight: 200 }}>
+      <div ref={scrollRef} className="my-[18px] min-h-[200px] flex-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-[18px]">
         {mensajes.length === 0 && (
-          <div style={{ textAlign: 'center', marginTop: 40 }}>
-            <p style={{ fontWeight: 600, marginBottom: 16, color: '#6b7280' }}>¿En qué te puedo ayudar?</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+          <div className="mt-10 text-center">
+            <p className="mb-4 font-semibold text-gray-500">¿En qué te puedo ayudar?</p>
+            <div className="flex flex-wrap justify-center gap-2">
               {SUGERENCIAS.map(s => (
-                <button key={s} className="sugerencia" onClick={() => enviar(s)}>{s}</button>
+                <button key={s} onClick={() => enviar(s)}
+                  className="rounded-full border-[1.5px] border-gray-200 bg-gray-50 px-3.5 py-2 text-[0.83rem] text-gray-700 transition-colors hover:border-marca">
+                  {s}
+                </button>
               ))}
             </div>
           </div>
         )}
 
         {mensajes.map((m, idx) => (
-          <div key={idx} style={{ display: 'flex', justifyContent: m.rol === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
-            <div className={`burbuja-ia ${m.rol === 'user' ? 'usuario' : m.error ? 'error' : ''}`}>
+          <div key={idx} className={`mb-3 flex ${m.rol === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`inline-block max-w-[75%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-[0.9rem] leading-normal
+              ${m.rol === 'user' ? 'bg-marca text-white' : m.error ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-800'}`}>
               {m.contenido}
               {m.rol === 'assistant' && !m.error && (
-                <div className="burbuja-pie">
+                <div className="mt-2 flex flex-wrap items-center gap-2.5 text-[0.72rem] text-gray-500">
                   <span>{m.modelo} · {m.latencia} ms</span>
-                  <button onClick={() => copiar(m.contenido, idx)}>
+                  <button onClick={() => copiar(m.contenido, idx)} className="p-0 font-bold text-blue-600">
                     {copiado === idx ? 'Copiado' : 'Copiar para tu campaña'}
                   </button>
                 </div>
@@ -107,29 +114,26 @@ export default function AsistentePage() {
         ))}
 
         {cargando && (
-          <div className="burbuja-ia" style={{ color: '#6b7280' }}>
-            El modelo está pensando<span style={{ animation: 'pulse 1s infinite' }}>...</span>
+          <div className="inline-block rounded-xl bg-gray-100 px-3.5 py-2.5 text-[0.9rem] text-gray-500">
+            El modelo está pensando<span className="animate-pulse">...</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={e => { e.preventDefault(); enviar() }} style={{ display: 'flex', gap: 10 }}>
+      <form onSubmit={e => { e.preventDefault(); enviar() }} className="flex gap-2.5">
         <input
-          className="entrada"
+          className={`${claseEntrada} flex-1 rounded-[10px] px-4 py-3`}
           value={texto}
           onChange={e => setTexto(e.target.value)}
           disabled={cargando}
           maxLength={5000}
           placeholder="Escribe tu pregunta o pide un mensaje para tu campaña..."
-          style={{ flex: 1, padding: '12px 16px', borderRadius: 10 }}
         />
-        <button type="submit" className="boton boton-primario" disabled={cargando || !texto.trim()} style={{ padding: '12px 22px', borderRadius: 10 }}>
+        <Boton type="submit" tamano="lg" className="rounded-[10px]" disabled={cargando || !texto.trim()}>
           {cargando ? 'Esperando...' : 'Enviar'}
-        </button>
+        </Boton>
       </form>
-      <p className="texto-suave" style={{ fontSize: '0.74rem', marginTop: 8 }}>
-        El modelo es pequeño y puede equivocarse. Revisa sus respuestas antes de usarlas.
-      </p>
+      <p className="mt-2 text-[0.74rem] text-gray-500">El modelo es pequeño y puede equivocarse. Revisa sus respuestas antes de usarlas.</p>
     </div>
   )
 }

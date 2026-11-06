@@ -2,11 +2,11 @@
 import { get, post } from './cliente'
 
 export const ESTADOS_ENTREGA = {
-  pendiente: { label: 'Pendiente', clase: 'pill-pending' },
-  enviado: { label: 'Enviado', clase: 'pill-sent' },
-  entregado: { label: 'Entregado', clase: 'pill-delivered' },
-  leido: { label: 'Leído', clase: 'pill-read' },
-  fallido: { label: 'Fallido', clase: 'pill-failed' },
+  pendiente: { label: 'Pendiente', color: 'amarilla' },
+  enviado: { label: 'Enviado', color: 'gris' },
+  entregado: { label: 'Entregado', color: 'azul' },
+  leido: { label: 'Leído', color: 'verde' },
+  fallido: { label: 'Fallido', color: 'roja' },
 }
 
 // Numero de WhatsApp de toda la plataforma: solo staff.

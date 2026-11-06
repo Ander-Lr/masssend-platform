@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { claseEnlace } from '../../components/ui/clases'
 import AuthCard from '../../components/auth/AuthCard'
 import AlertBox from '../../components/auth/AlertBox'
 import { completarGoogle } from '../../api/identidad'
@@ -28,10 +29,10 @@ export default function GoogleCallbackPage() {
 
   return (
     <AuthCard title="Acceso con Google">
-      {error ? <AlertBox>{error}</AlertBox> : <p className="texto-suave" style={{ textAlign: 'center' }}>Validando tu cuenta de Google...</p>}
+      {error ? <AlertBox>{error}</AlertBox> : <p className="text-center text-[0.88rem] text-gray-500">Validando tu cuenta de Google...</p>}
       {error && (
-        <div style={{ textAlign: 'center' }}>
-          <Link className="boton-enlace" to="/login">Volver a iniciar sesión</Link>
+        <div className="text-center">
+          <Link className={claseEnlace} to="/login">Volver a iniciar sesión</Link>
         </div>
       )}
     </AuthCard>

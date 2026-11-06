@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { modulosVisibles } from '../../modulos'
-import { ICONOS } from './iconos'
 import { useWhatsapp } from '../../context/WhatsappContext'
+import { modulosVisibles } from '../../modulos'
+import Insignia, { Punto } from '../ui/Insignia'
+import { ICONOS } from './iconos'
 
 const CLAVE_CONTRAIDO = 'masssend.menuContraido'
 
@@ -27,49 +28,53 @@ function Chevron({ contraido }) {
 function EstadoWhatsapp({ contraido }) {
   const { conectado } = useWhatsapp()
   if (conectado === null) return null
-  const clase = conectado ? 'on' : 'off'
+  const texto = conectado ? 'WA Conectado' : 'WA Desconectado'
   if (contraido) {
-    return <div className={`estado-wa-menu ${clase}`} style={{ justifyContent: 'center', background: 'none', border: 'none', margin: '0 0 4px' }} title={conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado'}><i /></div>
+    return <div className="mb-1 flex justify-center py-2" title={texto}><Punto encendido={conectado} parpadea /></div>
   }
-  return <div className={`estado-wa-menu ${clase}`}><i />{conectado ? 'WA Conectado' : 'WA Desconectado'}</div>
+  return (
+    <div className={`mx-3 mb-1 flex items-center gap-[7px] rounded-lg border px-3 py-2 text-[0.72rem] font-semibold
+      ${conectado ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600' : 'border-red-500/20 bg-red-500/[0.08] text-red-600'}`}>
+      <Punto encendido={conectado} parpadea />{texto}
+    </div>
+  )
 }
 
 export default function Layout() {
   const { usuario, cerrarSesion } = useAuth()
   const [contraido, setContraido] = useState(leerContraido)
-  const ancho = contraido ? 64 : 220
 
   useEffect(() => {
     try { localStorage.setItem(CLAVE_CONTRAIDO, contraido ? '1' : '0') } catch { /* sin almacenamiento */ }
   }, [contraido])
 
   return (
-    <div className="layout">
-      <aside className="menu" style={{ width: ancho, minWidth: ancho }}>
-        <div className="menu-cabecera" style={{ justifyContent: contraido ? 'center' : 'space-between', padding: contraido ? '18px 0' : '18px 16px 18px 20px' }}>
-          {!contraido && (
-            <span className="menu-marca">Mass<span>Send</span></span>
-          )}
+    <div className="flex h-screen w-full">
+      <aside className={`flex shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ${contraido ? 'w-16' : 'w-[220px]'}`}>
+        <div className={`flex min-h-[60px] items-center border-b border-gray-200 ${contraido ? 'justify-center' : 'justify-between pl-5 pr-4'}`}>
+          {!contraido && <span className="whitespace-nowrap text-[1.1rem] font-bold text-tinta">Mass<span className="text-marca">Send</span></span>}
           <button
-            className="menu-plegar"
             onClick={() => setContraido(c => !c)}
             title={contraido ? 'Expandir menú' : 'Contraer menú'}
             aria-label={contraido ? 'Expandir menú' : 'Contraer menú'}
+            className="flex items-center justify-center rounded-md p-1 text-gray-500 hover:bg-gray-100"
           >
             <Chevron contraido={contraido} />
           </button>
         </div>
 
-        <nav className="menu-nav">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto py-3">
           {modulosVisibles(usuario).map(m => (
             <NavLink
               key={m.id}
               to={m.ruta}
               end={m.ruta === '/'}
               title={contraido ? m.label : ''}
-              className={({ isActive }) => `menu-item${isActive ? ' activo' : ''}${contraido ? ' contraido' : ''}`}
+              className={({ isActive }) => `flex items-center whitespace-nowrap border-l-[3px] text-[0.9rem] transition-colors
+                ${contraido ? 'justify-center py-[11px]' : 'gap-2.5 px-5 py-2.5'}
+                ${isActive ? 'border-marca bg-marca-suave font-semibold text-marca' : 'border-transparent text-gray-700 hover:bg-gray-50'}`}
             >
-              <span style={{ flexShrink: 0, display: 'flex' }}>{ICONOS[m.id]}</span>
+              <span className="flex shrink-0">{ICONOS[m.id]}</span>
               {!contraido && <span>{m.label}</span>}
             </NavLink>
           ))}
@@ -77,19 +82,19 @@ export default function Layout() {
 
         <EstadoWhatsapp contraido={contraido} />
 
-        <div className="menu-pie" style={{ alignItems: contraido ? 'center' : 'stretch', padding: contraido ? '12px 0' : '12px 16px' }}>
+        <div className={`flex flex-col gap-2 border-t border-gray-200 ${contraido ? 'items-center py-3' : 'px-4 py-3'}`}>
           {!contraido && (
-            <div className="menu-usuario">
-              <strong>{usuario.nombre}</strong>
-              <span>{usuario.correo}</span>
-              {usuario.es_staff && <span className="insignia insignia-verde" style={{ alignSelf: 'flex-start', marginTop: 4 }}>Staff</span>}
+            <div className="flex flex-col overflow-hidden text-[0.74rem] text-gray-500">
+              <strong className="truncate text-[0.82rem] text-tinta">{usuario.nombre}</strong>
+              <span className="truncate">{usuario.correo}</span>
+              {usuario.es_staff && <Insignia color="verde" className="mt-1 self-start">Staff</Insignia>}
             </div>
           )}
           <button
-            className="boton boton-secundario"
             onClick={cerrarSesion}
             title={contraido ? 'Cerrar sesión' : ''}
-            style={contraido ? { width: 38, height: 38, padding: 0 } : { width: '100%', padding: 8, fontSize: '0.8rem' }}
+            className={`flex items-center justify-center gap-1.5 rounded-[7px] border border-gray-200 bg-gray-100 text-[0.8rem] font-semibold text-gray-700 hover:bg-gray-200
+              ${contraido ? 'size-[38px]' : 'w-full p-2'}`}
           >
             {ICONOS.salir}
             {!contraido && 'Cerrar sesión'}
@@ -97,7 +102,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="main">
+      <main className="flex flex-1 overflow-hidden">
         <Outlet />
       </main>
     </div>

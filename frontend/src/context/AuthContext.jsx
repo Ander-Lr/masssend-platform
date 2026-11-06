@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { tokens } from '../api/cliente'
 import * as identidad from '../api/identidad'
+import Boton from '../components/ui/Boton'
+import { Fondo } from '../components/ui/Modal'
 
 const AuthContext = createContext(null)
 const CLAVE_DESAFIO = 'masssend.desafio'
@@ -95,18 +97,16 @@ export function AuthProvider({ children }) {
     }}>
       {children}
       {sesionExpirada && (
-        <div className="modal-fondo">
-          <div className="modal" style={{ maxWidth: 380, textAlign: 'center' }}>
-            <h3 style={{ marginBottom: 8 }}>Tu sesión ha expirado</h3>
-            <p className="texto-suave" style={{ marginBottom: 20, lineHeight: 1.5 }}>
+        <Fondo>
+          <div className="w-full max-w-[380px] rounded-[14px] bg-white px-8 py-7 text-center shadow-2xl">
+            <h3 className="mb-2 text-lg font-bold text-tinta">Tu sesión ha expirado</h3>
+            <p className="mb-5 text-[0.9rem] leading-normal text-gray-500">
               Por seguridad, la sesión se cierra tras un tiempo de inactividad.
               Vuelve a iniciar sesión para continuar donde estabas.
             </p>
-            <button className="boton boton-primario boton-bloque" onClick={reingresar}>
-              Iniciar sesión de nuevo
-            </button>
+            <Boton bloque tamano="lg" onClick={reingresar}>Iniciar sesión de nuevo</Boton>
           </div>
-        </div>
+        </Fondo>
       )}
     </AuthContext.Provider>
   )

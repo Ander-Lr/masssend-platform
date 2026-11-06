@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { claseEnlace } from '../../components/ui/clases'
 import AuthCard from '../../components/auth/AuthCard'
 import FormField from '../../components/auth/FormField'
 import AlertBox from '../../components/auth/AlertBox'
@@ -43,8 +44,8 @@ export default function RegisterPage() {
         <AlertBox>{error}</AlertBox>
         <PrimaryButton loading={cargando}>{cargando ? 'Creando cuenta...' : 'Registrarme'}</PrimaryButton>
       </form>
-      <div style={{ textAlign: 'center', marginTop: 18 }}>
-        <Link className="boton-enlace" to="/login">¿Ya tienes cuenta? Inicia sesión</Link>
+      <div className="mt-[18px] text-center">
+        <Link className={claseEnlace} to="/login">¿Ya tienes cuenta? Inicia sesión</Link>
       </div>
     </AuthCard>
   )

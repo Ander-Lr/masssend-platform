@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { urlGoogle } from '../../api/identidad'
+import { claseBoton } from '../ui/clases'
 
 // Pide al backend la URL de Google y redirige. El callback vuelve a /auth/google/callback.
 export default function GoogleButton({ onError }) {
@@ -21,8 +22,7 @@ export default function GoogleButton({ onError }) {
       type="button"
       onClick={continuar}
       disabled={cargando}
-      className="boton boton-bloque"
-      style={{ background: '#fff', border: '1.5px solid #e5e7eb', color: '#374151', fontWeight: 600, padding: 11, gap: 10 }}
+      className={`${claseBoton({ variante: 'blanco', bloque: true })} gap-2.5 p-[11px] text-[0.9rem]`}
     >
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>

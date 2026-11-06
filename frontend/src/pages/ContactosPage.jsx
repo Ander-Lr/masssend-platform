@@ -5,6 +5,12 @@ import AlertBox from '../components/auth/AlertBox'
 import FormField from '../components/auth/FormField'
 import Modal from '../components/ui/Modal'
 import Etiquetas from '../components/ui/Etiquetas'
+import Boton, { BotonMini } from '../components/ui/Boton'
+import Insignia from '../components/ui/Insignia'
+import Pagina, { Vacio } from '../components/ui/Pagina'
+import { BarraSeleccion, ContenedorTabla, Paginacion, Tabla } from '../components/ui/Tabla'
+import { Ayuda, Etiqueta, claseCasilla, claseFiltro } from '../components/ui/Campo'
+import { claseBoton } from '../components/ui/clases'
 import { confirmar } from '../components/ui/confirmar'
 import {
   crearContacto, editarContacto, eliminarContacto, eliminarContactos, etiquetas as pedirEtiquetas, listarContactos,
@@ -65,10 +71,11 @@ function FormularioContacto({ contacto, onCerrar, onGuardado }) {
     >
       <form onSubmit={guardar}>
         {!editando && (
-          <div className="campo">
-            <label>Teléfono</label>
-            <div className="telefono-grupo">
-              <select value={pais} onChange={e => setPais(e.target.value)} aria-label="País">
+          <div className="mb-4">
+            <Etiqueta>Teléfono</Etiqueta>
+            <div className="flex overflow-hidden rounded-lg border-[1.5px] border-gray-200 focus-within:border-marca">
+              <select value={pais} onChange={e => setPais(e.target.value)} aria-label="País"
+                className="border-r border-gray-200 bg-gray-50 px-2.5 text-[0.88rem] font-semibold text-gray-700 outline-none">
                 <option value="ec">EC +593</option>
                 <option value="otro">Otro país</option>
               </select>
@@ -80,10 +87,11 @@ function FormularioContacto({ contacto, onCerrar, onGuardado }) {
                 inputMode="tel"
                 required
                 autoFocus
+                className="min-w-0 flex-1 px-3 py-2.5 text-[0.9rem] outline-none"
               />
             </div>
             {vistaPrevia && !vistaPrevia.ok && (
-              <p style={{ color: '#b45309', fontSize: '0.76rem', marginTop: 6 }}>{vistaPrevia.error}</p>
+              <Ayuda color="text-amber-700">{vistaPrevia.error}</Ayuda>
             )}
           </div>
         )}
@@ -91,9 +99,9 @@ function FormularioContacto({ contacto, onCerrar, onGuardado }) {
         <FormField label="Etiquetas (opcional, separadas por coma)" value={etiquetas} onChange={setEtiquetas} required={false} placeholder="cliente, lead" />
         {editando && <FormField label="Notas (opcional)" value={notas} onChange={setNotas} required={false} />}
         <AlertBox>{error}</AlertBox>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button type="button" className="boton boton-secundario" onClick={onCerrar}>Cancelar</button>
-          <button type="submit" className="boton boton-primario" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button>
+        <div className="flex justify-end gap-2.5">
+          <Boton variante="secundario" onClick={onCerrar}>Cancelar</Boton>
+          <Boton type="submit" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</Boton>
         </div>
       </form>
     </Modal>
@@ -214,84 +222,73 @@ export default function ContactosPage() {
   }
 
   return (
-    <div className="pagina" style={{ background: '#f8f9fa' }}>
-      <div className="pagina-encabezado" style={{ alignItems: 'center' }}>
-        <h1 className="pagina-titulo">Contactos</h1>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link to="/importar" className="boton boton-violeta" style={{ textDecoration: 'none', padding: '8px 18px', fontWeight: 600, fontSize: '0.85rem' }}>
-            Importar CSV
-          </Link>
-          <button className="boton boton-primario" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setFormulario('nuevo')}>
-            + Agregar contacto
-          </button>
-        </div>
-      </div>
-
-      <div className="filtros">
-        <input className="entrada" style={{ width: 260 }} placeholder="Buscar por nombre o teléfono..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <select className="entrada" value={etiqueta} onChange={e => setEtiqueta(e.target.value)}>
+    <Pagina
+      titulo="Contactos"
+      acciones={<>
+        <Link to="/importar" className={`${claseBoton({ variante: 'indigo' })} px-[18px] py-2 text-[0.85rem] font-semibold`}>Importar CSV</Link>
+        <Boton className="px-[18px] py-2 text-[0.85rem]" onClick={() => setFormulario('nuevo')}>+ Agregar contacto</Boton>
+      </>}
+    >
+      <div className="mb-[18px] flex flex-wrap gap-2.5">
+        <input className={`${claseFiltro} w-[260px]`} placeholder="Buscar por nombre o teléfono..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        <select className={claseFiltro} value={etiqueta} onChange={e => setEtiqueta(e.target.value)}>
           <option value="">Todas las etiquetas</option>
           {disponibles.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
 
       {seleccion.size > 0 && (
-        <div className="barra-seleccion">
-          <strong>{plural(seleccion.size, 'contacto seleccionado', 'contactos seleccionados')}</strong>
-          <button className="boton boton-peligro" style={{ padding: '6px 16px', fontSize: '0.82rem' }} onClick={eliminarSeleccion}>Eliminar seleccionados</button>
-          <button className="boton boton-secundario" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={() => setSeleccion(new Set())}>Cancelar selección</button>
-        </div>
+        <BarraSeleccion texto={plural(seleccion.size, 'contacto seleccionado', 'contactos seleccionados')}>
+          <Boton variante="peligro" tamano="sm" onClick={eliminarSeleccion}>Eliminar seleccionados</Boton>
+          <Boton variante="secundario" tamano="sm" onClick={() => setSeleccion(new Set())}>Cancelar selección</Boton>
+        </BarraSeleccion>
       )}
 
       <AlertBox>{error}</AlertBox>
 
-      <div className="tabla-contenedor">
+      <ContenedorTabla>
         {cargando && contactos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>Cargando contactos...</div>
+          <Vacio>Cargando contactos...</Vacio>
         ) : contactos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#aaa' }}>
+          <Vacio>
             {texto || etiqueta ? 'Ningún contacto coincide con la búsqueda.' : 'Aún no tienes contactos. Agrega uno o importa un CSV.'}
-          </div>
+          </Vacio>
         ) : (
-          <table style={{ opacity: cargando ? 0.6 : 1 }}>
+          <Tabla atenuada={cargando}>
             <thead>
               <tr>
-                <th style={{ width: 36 }}><input type="checkbox" className="casilla" checked={todosMarcados} onChange={alternarTodos} aria-label="Seleccionar todos" /></th>
+                <th className="w-9"><input type="checkbox" className={claseCasilla} checked={todosMarcados} onChange={alternarTodos} aria-label="Seleccionar todos" /></th>
                 <th>Nombre</th><th>Teléfono</th><th>Etiquetas</th><th>Estado</th><th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {contactos.map(c => (
-                <tr key={c.id} className={seleccion.has(c.id) ? 'seleccionada' : ''}>
-                  <td><input type="checkbox" className="casilla" checked={seleccion.has(c.id)} onChange={() => alternar(c.id)} aria-label={`Seleccionar ${c.nombre || c.telefono}`} /></td>
-                  <td style={{ fontWeight: 600 }}>{c.nombre || <span style={{ color: '#d1d5db' }}>Sin nombre</span>}</td>
-                  <td style={{ fontFamily: 'monospace', color: '#555' }}>{mostrarTelefono(c.telefono)}</td>
+                <tr key={c.id} className={seleccion.has(c.id) ? 'bg-indigo-50' : ''}>
+                  <td><input type="checkbox" className={claseCasilla} checked={seleccion.has(c.id)} onChange={() => alternar(c.id)} aria-label={`Seleccionar ${c.nombre || c.telefono}`} /></td>
+                  <td className="font-semibold">{c.nombre || <span className="font-normal text-gray-300">Sin nombre</span>}</td>
+                  <td className="font-mono text-gray-600">{mostrarTelefono(c.telefono)}</td>
                   <td><Etiquetas lista={c.etiquetas} /></td>
                   <td>
-                    <span className={`insignia ${c.dado_de_baja ? 'insignia-roja' : 'insignia-verde'}`}>{c.dado_de_baja ? 'Baja' : 'Activo'}</span>
+                    <Insignia color={c.dado_de_baja ? 'roja' : 'verde'}>{c.dado_de_baja ? 'Baja' : 'Activo'}</Insignia>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="boton-mini gris" onClick={() => setFormulario(c)}>Editar</button>
-                      <button className={`boton-mini ${c.dado_de_baja ? 'verde' : 'amarillo'}`} onClick={() => alternarBaja(c)}>
+                    <div className="flex gap-1.5">
+                      <BotonMini onClick={() => setFormulario(c)}>Editar</BotonMini>
+                      <BotonMini color={c.dado_de_baja ? 'verde' : 'amarillo'} onClick={() => alternarBaja(c)}>
                         {c.dado_de_baja ? 'Activar' : 'Dar de baja'}
-                      </button>
-                      <button className="boton-mini rojo" onClick={() => eliminar(c)}>Eliminar</button>
+                      </BotonMini>
+                      <BotonMini color="rojo" onClick={() => eliminar(c)}>Eliminar</BotonMini>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Tabla>
         )}
-      </div>
+      </ContenedorTabla>
 
       {(pagina > 1 || siguiente) && (
-        <div className="paginacion">
-          <button className="boton boton-secundario" style={{ padding: '6px 14px' }} disabled={pagina === 1 || cargando} onClick={irAnterior}>Anterior</button>
-          <span>Página {pagina}</span>
-          <button className="boton boton-secundario" style={{ padding: '6px 14px' }} disabled={!siguiente || cargando} onClick={irSiguiente}>Siguiente</button>
-        </div>
+        <Paginacion pagina={pagina} hayAnterior={pagina > 1} haySiguiente={Boolean(siguiente)} cargando={cargando} onAnterior={irAnterior} onSiguiente={irSiguiente} />
       )}
 
       {formulario && (
@@ -301,6 +298,6 @@ export default function ContactosPage() {
           onGuardado={alGuardar}
         />
       )}
-    </div>
+    </Pagina>
   )
 }

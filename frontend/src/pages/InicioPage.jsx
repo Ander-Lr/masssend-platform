@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { modulosVisibles } from '../modulos'
 import { saldo } from '../api/creditos'
 import { listarCampanas } from '../api/campanas'
+import Insignia from '../components/ui/Insignia'
+import Estadistica, { Estadisticas } from '../components/ui/Estadistica'
 
 // Resumen de la cuenta: cada dato se pide aparte para que uno lento no frene a los demas.
 function useResumen() {
@@ -30,48 +32,47 @@ export default function InicioPage() {
   const accesos = modulosVisibles(usuario).filter(m => m.titulo)
   const resumen = useResumen()
   const metricas = [
-    { clave: 'creditos', label: 'Créditos disponibles', clase: 'green', ruta: '/creditos' },
-    { clave: 'enCurso', label: 'Campañas enviándose', clase: 'purple', ruta: '/campanas' },
-    { clave: 'borradores', label: 'Borradores listos', clase: '', ruta: '/campanas' },
-    { clave: 'completadas', label: 'Campañas completadas', clase: 'blue', ruta: '/campanas' },
+    { clave: 'creditos', label: 'Créditos disponibles', color: 'verde', ruta: '/creditos' },
+    { clave: 'enCurso', label: 'Campañas enviándose', color: 'morado', ruta: '/campanas' },
+    { clave: 'borradores', label: 'Borradores listos', color: 'normal', ruta: '/campanas' },
+    { clave: 'completadas', label: 'Campañas completadas', color: 'azul', ruta: '/campanas' },
   ]
 
   return (
-    <div className="pagina" style={{ background: '#f8fafc', padding: '36px 40px' }}>
-      <div className="pagina-encabezado" style={{ alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="avatar">{usuario.nombre?.[0]?.toUpperCase() || 'U'}</div>
+    <div className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-10 sm:py-9">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-marca text-[1.4rem] font-bold text-white">
+            {usuario.nombre?.[0]?.toUpperCase() || 'U'}
+          </div>
           <div>
-            <p className="texto-suave" style={{ fontSize: '0.85rem' }}>{saludoDelMomento()},</p>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{usuario.nombre}</h1>
+            <p className="text-[0.85rem] text-gray-400">{saludoDelMomento()},</p>
+            <h1 className="text-2xl font-bold">{usuario.nombre}</h1>
           </div>
         </div>
-        <span className={`insignia ${usuario.mfa_activo ? 'insignia-verde' : 'insignia-roja'}`} style={{ padding: '8px 16px', fontSize: '0.8rem' }}>
+        <Insignia color={usuario.mfa_activo ? 'verde' : 'roja'} grande>
           {usuario.mfa_activo ? 'Cuenta protegida con doble factor' : 'Doble factor desactivado'}
-        </span>
+        </Insignia>
       </div>
 
-      <div className="stats-grid" style={{ marginTop: 24, marginBottom: 0 }}>
+      <Estadisticas className="mt-6 mb-0">
         {metricas.map(m => (
-          <button key={m.clave} className={`stat-card ${m.clase}`} style={{ cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => navigate(m.ruta)}>
-            <div className="stat-num">{resumen[m.clave] ?? '...'}</div>
-            <div className="stat-label">{m.label}</div>
-          </button>
+          <Estadistica key={m.clave} valor={resumen[m.clave] ?? '...'} etiqueta={m.label} color={m.color} onClick={() => navigate(m.ruta)} />
         ))}
-      </div>
+      </Estadisticas>
 
-      <p className="texto-suave" style={{ fontSize: '0.95rem', margin: '28px 0 20px' }}>¿Qué quieres hacer hoy?</p>
+      <p className="mt-7 mb-5 text-[0.95rem] text-gray-500">¿Qué quieres hacer hoy?</p>
 
-      <div className="accesos">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5">
         {accesos.map(m => (
           <button
             key={m.id}
-            className="acceso"
-            style={{ background: `${m.color}14`, borderColor: `${m.color}33`, '--color': m.color }}
+            style={{ '--c': m.color }}
+            className="rounded-2xl border border-(--c)/20 bg-(--c)/8 px-5 py-6 text-left transition duration-200 hover:-translate-y-1 hover:shadow-[0_8px_24px_color-mix(in_srgb,var(--c)_15%,transparent)]"
             onClick={() => navigate(m.ruta)}
           >
-            <h3 style={{ color: m.color }}>{m.titulo}</h3>
-            <p>{m.desc}</p>
+            <h3 className="mb-1.5 text-base font-bold text-(--c)">{m.titulo}</h3>
+            <p className="text-[0.82rem] leading-normal text-gray-500">{m.desc}</p>
           </button>
         ))}
       </div>

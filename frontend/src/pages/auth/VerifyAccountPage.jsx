@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { claseEnlace } from '../../components/ui/clases'
 import AuthCard from '../../components/auth/AuthCard'
 import FormField, { CodigoField } from '../../components/auth/FormField'
 import AlertBox from '../../components/auth/AlertBox'
@@ -61,9 +62,9 @@ export default function VerifyAccountPage() {
           {cargando ? 'Verificando...' : 'Activar cuenta'}
         </PrimaryButton>
       </form>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18 }}>
+      <div className="mt-[18px] flex justify-between">
         <LinkButton onClick={reenviar}>{reenviando ? 'Enviando...' : 'Reenviar código'}</LinkButton>
-        <Link className="boton-enlace" to="/login">Volver a iniciar sesión</Link>
+        <Link className={claseEnlace} to="/login">Volver a iniciar sesión</Link>
       </div>
     </AuthCard>
   )

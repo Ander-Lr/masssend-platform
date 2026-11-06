@@ -1,7 +1,26 @@
-// Ventana modal con titulo y boton de cierre. Se cierra con Escape.
+// Ventana modal con titulo y boton de cierre. Se cierra con Escape o al hacer clic fuera.
 import { useEffect } from 'react'
 
-export default function Modal({ titulo, subtitulo, onCerrar, children, ancho = 440 }) {
+export function Cerrar({ onClick }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Cerrar" className="flex rounded-md p-0.5 text-gray-400 hover:bg-gray-100">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+    </button>
+  )
+}
+
+export function Fondo({ children, onCerrar }) {
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-[2px]"
+      onMouseDown={e => { if (onCerrar && e.target === e.currentTarget) onCerrar() }}
+    >
+      {children}
+    </div>
+  )
+}
+
+export default function Modal({ titulo, subtitulo, onCerrar, children, ancho = 'max-w-md' }) {
   useEffect(() => {
     const alPresionar = e => { if (e.key === 'Escape') onCerrar() }
     window.addEventListener('keydown', alPresionar)
@@ -9,19 +28,17 @@ export default function Modal({ titulo, subtitulo, onCerrar, children, ancho = 4
   }, [onCerrar])
 
   return (
-    <div className="modal-fondo" onMouseDown={e => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={titulo} style={{ maxWidth: ancho, padding: 28 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12 }}>
+    <Fondo onCerrar={onCerrar}>
+      <div role="dialog" aria-modal="true" aria-label={titulo} className={`max-h-[92vh] w-full overflow-y-auto rounded-[14px] bg-white p-7 shadow-2xl ${ancho}`}>
+        <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>{titulo}</h2>
-            {subtitulo && <p className="texto-suave" style={{ fontSize: '0.78rem', marginTop: 4 }}>{subtitulo}</p>}
+            <h2 className="text-base font-bold">{titulo}</h2>
+            {subtitulo && <p className="mt-1 text-[0.78rem] text-gray-500">{subtitulo}</p>}
           </div>
-          <button className="modal-cerrar" onClick={onCerrar} aria-label="Cerrar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+          <Cerrar onClick={onCerrar} />
         </div>
         {children}
       </div>
-    </div>
+    </Fondo>
   )
 }

@@ -50,8 +50,8 @@ export default function RetornoPagoPage() {
   }, [estado])
 
   return (
-    <AuthCard title="Estado del pago" width={440}>
-      {estado.tipo === 'cargando' && <p className="texto-suave" style={{ textAlign: 'center', marginBottom: 16 }}>{estado.texto}</p>}
+    <AuthCard title="Estado del pago" ancho="w-[440px]">
+      {estado.tipo === 'cargando' && <p className="mb-4 text-center text-[0.88rem] text-gray-500">{estado.texto}</p>}
       {estado.tipo === 'exito' && <AlertBox type="success">{estado.texto}</AlertBox>}
       {estado.tipo === 'error' && <AlertBox>{estado.texto}</AlertBox>}
       <PrimaryButton type="button" disabled={estado.tipo === 'cargando'} onClick={() => navigate('/creditos', { replace: true })}>
